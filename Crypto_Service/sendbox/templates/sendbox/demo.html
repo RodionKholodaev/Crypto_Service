@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Песочница | CryptoBotHub</title>
+    <style>
+        :root {
+            --primary: #6c5ce7;
+            --secondary: #a29bfe;
+            --dark: #2d3436;
+            --light: #f5f6fa;
+            --success: #00b894;
+            --danger: #d63031;
+            --warning: #fdcb6e;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f3f4f6;
+            color: var(--dark);
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        /* Header */
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        
+        .page-title {
+            font-size: 28px;
+            color: var(--dark);
+        }
+        
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s;
+            display: inline-block;
+            border: none;
+            cursor: pointer;
+        }
+        
+        .btn-primary {
+            background-color: var(--primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            background-color: #5649d6;
+        }
+        
+        .btn-outline {
+            background-color: transparent;
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+        
+        .btn-outline:hover {
+            background-color: rgba(108, 92, 231, 0.1);
+        }
+        
+        /* Demo Card */
+        .demo-card {
+            background-color: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.05);
+            margin-bottom: 30px;
+        }
+        
+        .demo-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .demo-title {
+            font-size: 22px;
+            color: var(--dark);
+            display: flex;
+            align-items: center;
+        }
+        
+        .demo-title i {
+            margin-right: 10px;
+            color: var(--primary);
+            font-size: 24px;
+        }
+        
+        .demo-badge {
+            background-color: var(--warning);
+            color: var(--dark);
+            padding: 5px 10px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        
+        /* Demo Content */
+        .demo-content {
+            display: grid;
+            grid-template-columns: 300px 1fr;
+            gap: 30px;
+        }
+        
+        .demo-sidebar {
+            background-color: #f9f9f9;
+            border-radius: 10px;
+            padding: 20px;
+        }
+        
+        .demo-main {
+            background-color: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 10px rgba(0,0,0,0.05);
+        }
+        
+        /* Balance Card */
+        .balance-card {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            color: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .balance-title {
+            font-size: 16px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+        
+        .balance-amount {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+        
+        .balance-note {
+            font-size: 14px;
+            opacity: 0.8;
+        }
+        
+        /* Strategy List */
+        .strategy-list {
+            margin-top: 20px;
+        }
+        
+        .strategy-item {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            border: 1px solid #eee;
+        }
+        
+        .strategy-item:hover {
+            border-color: var(--primary);
+        }
+        
+        .strategy-item.active {
+            border-color: var(--primary);
+            background-color: rgba(108, 92, 231, 0.1);
+        }
+        
+        .strategy-name {
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+        
+        .strategy-desc {
+            font-size: 14px;
+            color: #777;
+        }
+        
+        /* Chart Container */
+        .chart-container {
+            height: 400px;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .chart-placeholder {
+            background-color: #f5f6fa;
+            border-radius: 5px;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #777;
+        }
+        
+        /* Demo Controls */
+        .demo-controls {
+            display: flex;
+            justify-content: space-between;
+            padding: 20px;
+            border-top: 1px solid #eee;
+        }
+        
+        .control-group {
+            display: flex;
+            gap: 10px;
+        }
+        
+        /* Responsive */
+        @media (max-width: 992px) {
+            .demo-content {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <div class="page-header">
+            <h1 class="page-title">Песочница</h1>
+            <a href="{% index %}">
+                <button class="btn btn-outline"><i class="fas fa-arrow-left"></i> Назад в личный кабинет</button>
+            </a>
+        </div>
+        
+        <div class="demo-card">
+            <div class="demo-header">
+                <h2 class="demo-title"><i class="fas fa-flask"></i> Демо-режим</h2>
+                <span class="demo-badge">Виртуальный баланс</span>
+            </div>
+            
+            <div class="demo-content">
+                <div class="demo-sidebar">
+                    <div class="balance-card">
+                        <div class="balance-title">Ваш виртуальный баланс</div>
+                        <div class="balance-amount">10,000 USDT</div>
+                        <div class="balance-note">Обновлено: только что</div>
+                    </div>
+                    
+                    <div class="strategy-list">
+                        <div class="strategy-item active">
+                            <div class="strategy-name">RSI Scalper</div>
+                            <div class="strategy-desc">Скальпинг на RSI перекупленности</div>
+                        </div>
+                        <div class="strategy-item">
+                            <div class="strategy-name">Moving Average</div>
+                            <div class="strategy-desc">Трендовая стратегия на MA</div>
+                        </div>
+                        <div class="strategy-item">
+                            <div class="strategy-name">Bollinger Bands</div>
+                            <div class="strategy-desc">Торговля от границ канала</div>
+                        </div>
+                        <div class="strategy-item">
+                            <div class="strategy-name">MACD Crossover</div>
+                            <div class="strategy-desc">Пересечение MACD линий</div>
+                        </div>
+                    </div>
+                    
+                    <button class="btn btn-primary" style="width: 100%; margin-top: 20px;">
+                        <i class="fas fa-plus"></i> Создать свою стратегию
+                    </button>
+                </div>
+                
+                <div class="demo-main">
+                    <div class="chart-container">
+                        <div class="chart-placeholder">
+                            [ Здесь будет график TradingView с демо-торговлей ]
+                        </div>
+                    </div>
+                    
+                    <div class="demo-controls">
+                        <div class="control-group">
+                            <button class="btn btn-outline"><i class="fas fa-play"></i> Запустить</button>
+                            <button class="btn btn-outline"><i class="fas fa-pause"></i> Пауза</button>
+                            <button class="btn btn-outline"><i class="fas fa-stop"></i> Стоп</button>
+                        </div>
+                        
+                        <div class="control-group">
+                            <button class="btn btn-outline"><i class="fas fa-bolt"></i> 1x</button>
+                            <button class="btn btn-outline"><i class="fas fa-bolt"></i> 2x</button>
+                            <button class="btn btn-outline"><i class="fas fa-bolt"></i> 5x</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="demo-card">
+            <h2 class="demo-title"><i class="fas fa-chart-line"></i> Результаты демо-торговли</h2>
+            
+            <div style="margin-top: 20px; background-color: white; border-radius: 10px; padding: 20px; box-shadow: 0 3px 10px rgba(0,0,0,0.05);">
+                <p style="color: #777; text-align: center;">Здесь будет отображаться статистика вашей демо-торговли</p>
+                <div style="display: flex; justify-content: center; margin-top: 20px;">
+                    <button class="btn btn-primary"><i class="fas fa-file-export"></i> Экспорт результатов</button>
+                </div>
+            </div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="btn btn-primary" style="padding: 12px 30px;">
+                <i class="fas fa-rocket"></i> Перейти к реальной торговле
+            </button>
+            <p style="margin-top: 15px; color: #777;">Лимит демо-режима: 48 часов с момента первого запуска</p>
+        </div>
+    </div>
+
+    <script>
+        // Активация стратегий
+        document.querySelectorAll('.strategy-item').forEach(item => {
+            item.addEventListener('click', function() {
+                document.querySelectorAll('.strategy-item').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+            });
+        });
+        
+        // Имитация торговли
+        function startDemoTrading() {
+            console.log('Демо-торговля запущена');
+            // Здесь будет интеграция с TradingView и бэкендом
+        }
+    </script>
+</body>
+</html>
