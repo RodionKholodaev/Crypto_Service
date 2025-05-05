@@ -37,3 +37,7 @@ def home_view(request):
     user=request.user
     return render(request, 'users/home.html',{'user':user})
 
+def profile(request):
+    user=request.user
+    return render(request, 'users/profile1.html',{'user':user})
+
