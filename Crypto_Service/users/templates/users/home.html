@@ -57,26 +57,55 @@
         .sidebar-avatar {
             width: 50px;
             height: 50px;
-            background-color: var(--secondary);
             border-radius: 50%;
             margin-right: 15px;
+            overflow: hidden;
+            background-color: var(--secondary);
             display: flex;
             align-items: center;
             justify-content: center;
+            flex-shrink: 0; /* предотвращает сжатие */
+        }
+
+        .sidebar-avatar-image {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .sidebar-avatar-default {
             color: white;
             font-weight: bold;
             font-size: 20px;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
         }
+
         
+        .sidebar-user {
+            flex: 1;
+            min-width: 0; /* предотвращает переполнение текста */
+        }
+
         .sidebar-user h3 {
             font-size: 18px;
             margin-bottom: 5px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        
+
         .sidebar-user p {
             font-size: 14px;
             color: #777;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
+
         
         .sidebar-menu {
             list-style: none;
@@ -342,9 +371,18 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-avatar">JD</div>
+                <div class="sidebar-avatar">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Аватар" class="sidebar-avatar-image">
+                    {% else %}
+                        <div class="sidebar-avatar-default">
+                            {{ user.name|first|default:"?"|upper }}
+                        </div>
+                    {% endif %}
+                </div>
                 <div class="sidebar-user">
                     <h3><a href="{% url 'profile' %}">{{ user.name }}</a></h3>
+                    <p>{{ user.email }}</p>
                 </div>
             </div>
             <ul class="sidebar-menu">

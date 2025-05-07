@@ -23,3 +23,14 @@ class RegisterForm(UserCreationForm):
         if commit:
             user.save()
         return user
+
+
+# обновление данных в профиле
+class ProfileForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['name', 'avatar', 'theme']
+        
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['name'].required = False

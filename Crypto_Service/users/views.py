@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
 from .forms import RegisterForm
+from .forms import ProfileForm
 from django.contrib import messages
 
 def register_view(request):
@@ -37,7 +38,14 @@ def home_view(request):
     user=request.user
     return render(request, 'users/home.html',{'user':user})
 
-def profile(request):
-    user=request.user
-    return render(request, 'users/profile1.html',{'user':user})
 
+def profile(request):
+    if request.method == 'POST':
+        form = ProfileForm(request.POST, request.FILES, instance=request.user)
+        if form.is_valid():
+            form.save()
+            return redirect('/users/profile/?success=1')
+    else:
+        form = ProfileForm(instance=request.user)
+    
+    return render(request, 'users/profile1.html', {'form': form, 'user': request.user})

@@ -57,26 +57,54 @@
             .sidebar-avatar {
                 width: 50px;
                 height: 50px;
-                background-color: var(--secondary);
                 border-radius: 50%;
                 margin-right: 15px;
+                overflow: hidden;
+                background-color: var(--secondary);
                 display: flex;
                 align-items: center;
                 justify-content: center;
+                flex-shrink: 0; /* предотвращает сжатие */
+            }
+
+            .sidebar-avatar-image {
+                width: 100%;
+                height: 100%;
+                object-fit: cover;
+            }
+
+            .sidebar-avatar-default {
                 color: white;
                 font-weight: bold;
                 font-size: 20px;
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             }
-            
+
+            .sidebar-user {
+                flex: 1;
+                min-width: 0; /* предотвращает переполнение текста */
+            }
+
             .sidebar-user h3 {
                 font-size: 18px;
                 margin-bottom: 5px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
-            
+
             .sidebar-user p {
                 font-size: 14px;
                 color: #777;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
             }
+
             
             .sidebar-menu {
                 list-style: none;
@@ -387,15 +415,24 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <div class="sidebar-avatar">?</div>
+                <div class="sidebar-avatar">
+                    {% if user.avatar %}
+                        <img src="{{ user.avatar.url }}" alt="Аватар" class="sidebar-avatar-image">
+                    {% else %}
+                        <div class="sidebar-avatar-default">
+                            {{ user.name|first|default:"?"|upper }}
+                        </div>
+                    {% endif %}
+                </div>
                 <div class="sidebar-user">
-                    <h3>{{ user.username }}</h3>
+                    <h3><a href="{% url 'profile' %}">{{ user.name }}</a></h3>
+                    <p>{{ user.email }}</p>
                 </div>
             </div>
             <ul class="sidebar-menu">
                 <li><a href="#"><i class="fas fa-robot"></i> Мои боты</a></li>
                 <li><a href="#"><i class="fas fa-chart-line"></i> Статистика</a></li>
-                <li><a href="#"><i class="fas fa-key"></i> Главная</a></li>
+                <li><a href="{% url 'home' %}"><i class="fas fa-key"></i> Главная</a></li>
                 <li><a href="#"><i class="fas fa-question-circle"></i> Помощь</a></li>
             </ul>
         </aside>
@@ -415,7 +452,7 @@
                             {% if user.avatar %}
                                 <img src="{{ user.avatar.url }}" alt="Аватар" class="avatar-image" id="currentAvatar">
                             {% else %}
-                                <img src="/static/avatars/default.jpg" alt="Аватар" class="avatar-image" id="currentAvatar">
+                                <img src="users/static/avatars/default.jpg" alt="Аватар" class="avatar-image" id="currentAvatar">
                             {% endif %}
                             <div class="avatar-change" id="changeAvatarBtn">
                                 <i class="fas fa-camera"></i>
@@ -423,17 +460,17 @@
                             <input type="file" id="avatarInput" name="avatar" accept="image/*" style="display: none;">
                         </div>
                         <div class="profile-info">
-                            <h2>{{ user.username }}</h2>
+                            <h2>{{ user.name }}</h2>
                             <p>{{ user.email }}</p>
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="id_username" class="form-label">Имя пользователя</label>
-                        <input type="text" id="id_username" name="username" class="form-control" value="{{ user.username }}">
-                        {% if form.username.errors %}
+                        <label for="id_name" class="form-label">Имя</label>
+                        <input type="text" id="id_name" name="name" class="form-control" value="{{ user.name }}">
+                        {% if form.name.errors %}
                             <div class="error-message" style="color: var(--danger); margin-top: 5px;">
-                                {{ form.username.errors.0 }}
+                                {{ form.name.errors.0 }}
                             </div>
                         {% endif %}
                     </div>
@@ -445,13 +482,15 @@
 
                     <h3 style="margin: 25px 0 15px;">Выбор темы</h3>
                     <div class="theme-selector">
-                        <div class="theme-option light selected" data-theme="light">
+                        <div class="theme-option light {% if not user.theme %}selected{% endif %}" data-theme="light">
                             <i class="fas fa-sun"></i>
                             <p>Светлая тема</p>
+                            <input type="radio" name="theme" value="False" {% if not user.theme %}checked{% endif %} style="display: none;">
                         </div>
-                        <div class="theme-option dark" data-theme="dark">
+                        <div class="theme-option dark {% if user.theme %}selected{% endif %}" data-theme="dark">
                             <i class="fas fa-moon"></i>
                             <p>Темная тема</p>
+                            <input type="radio" name="theme" value="True" {% if user.theme %}checked{% endif %} style="display: none;">
                         </div>
                     </div>
 
@@ -486,9 +525,8 @@
             option.addEventListener('click', function() {
                 themeOptions.forEach(opt => opt.classList.remove('selected'));
                 this.classList.add('selected');
-                const theme = this.getAttribute('data-theme');
-                console.log('Выбрана тема:', theme);
-                // Здесь можно добавить логику изменения темы
+                const radio = this.querySelector('input[type="radio"]');
+                radio.checked = true;
             });
         });
 
