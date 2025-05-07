@@ -48,4 +48,4 @@ def profile(request):
     else:
         form = ProfileForm(instance=request.user)
     
-    return render(request, 'users/profile1.html', {'form': form, 'user': request.user})
+    return render(request, 'users/profile.html', {'form': form, 'user': request.user})
