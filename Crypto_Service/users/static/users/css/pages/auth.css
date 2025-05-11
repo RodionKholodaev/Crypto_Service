@@ -1,9 +1,20 @@
 /* auth.css для login.html и register.html */
+
+body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh; 
+    margin: 0;
+}
+
 .auth-card {
     background-color: var(--card-bg);
+    padding: 2rem;
     border-radius: 15px;
-    padding: 40px;
     box-shadow: var(--shadow);
+    max-width: 400px;
+    width: 100%;
     text-align: center;
 }
 
