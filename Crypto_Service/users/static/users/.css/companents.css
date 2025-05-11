@@ -1,0 +1,104 @@
+/* Кнопки */
+.btn {
+    padding: 10px 20px;
+    border-radius: var(--border-radius-sm);
+    font-weight: 600;
+    text-decoration: none;
+    transition: all 0.3s;
+    display: inline-block;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-primary {
+    background-color: var(--primary);
+    color: white;
+}
+
+.btn-primary:hover {
+    background-color: var(--primary-hover);
+}
+
+.btn-outline {
+    background-color: transparent;
+    color: var(--primary);
+    border: 1px solid var(--primary);
+}
+
+.btn-outline:hover {
+    background-color: rgba(108, 92, 231, 0.1);
+}
+
+.save-btn {
+    margin-top: 30px;
+    width: 100%;
+    padding: 15px;
+    font-size: 16px;
+}
+
+/* Карточки */
+.card {
+    background-color: white;
+    border-radius: var(--border-radius);
+    padding: 25px;
+    box-shadow: var(--card-shadow);
+}
+
+.card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.card-value {
+    font-size: 24px;
+    font-weight: 700;
+    margin: 10px 0;
+}
+
+.card-label {
+    font-size: 14px;
+    color: var(--muted-text);
+}
+
+/* API Keys Section */
+.api-keys-list {
+    margin-top: 20px;
+}
+
+.api-key-item {
+    background-color: white;
+    border-radius: var(--border-radius-sm);
+    padding: 15px;
+    margin-bottom: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: var(--card-shadow);
+}
+
+.api-key-info {
+    flex: 1;
+}
+
+.api-key-name {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.api-key-exchange {
+    font-size: 14px;
+    color: var(--muted-text);
+}
+
+.api-key-actions button {
+    margin-left: 10px;
+    padding: 5px 10px;
+    font-size: 14px;
+}

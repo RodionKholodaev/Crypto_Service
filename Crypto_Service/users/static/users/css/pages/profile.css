@@ -1,0 +1,245 @@
+/* Стили только для profile.html (можно дополнить при необходимости) */
+.profile-card { margin-bottom: 30px; }
+
+            
+/* Main Content */
+.main-content {
+    padding: 30px 0;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.page-title {
+    font-size: 28px;
+    color: var(--text-color);
+}
+
+/* Profile Section */
+.profile-card {
+    background-color: var(--card-bg);
+    border-radius: 15px;
+    padding: 30px;
+    box-shadow: var(--shadow);
+    margin-bottom: 30px;
+}
+
+.profile-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 30px;
+}
+
+.profile-avatar {
+    position: relative;
+    margin-right: 30px;
+}
+
+.avatar-image {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 5px solid var(--light);
+}
+
+.avatar-change {
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    background-color: var(--primary);
+    color: var(--light);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.avatar-change:hover {
+    background-color: var(--primary-hover, #5649d6);
+}
+
+.profile-info h2 {
+    font-size: 24px;
+    margin-bottom: 10px;
+}
+
+.profile-info p {
+    color: var(--muted-color);
+    margin-bottom: 5px;
+}
+
+.profile-plan {
+    display: inline-block;
+    padding: 5px 10px;
+    background-color: var(--primary);
+    color: var(--light);
+    border-radius: 20px;
+    font-size: 14px;
+    font-weight: 600;
+    margin-top: 10px;
+}
+
+/* Avatar Selection Modal */
+.avatar-modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+}
+
+.avatar-modal-content {
+    background-color: var(--card-bg);
+    border-radius: 15px;
+    padding: 30px;
+    width: 90%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+}
+
+.avatar-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 20px;
+}
+
+.avatar-option {
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+}
+
+.avatar-option img {
+    width: 80px;
+    height: 80px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 3px solid transparent;
+    transition: all 0.3s;
+}
+
+.avatar-option:hover img,
+.avatar-option.selected img {
+    border-color: var(--primary);
+}
+
+.avatar-option p {
+    margin-top: 5px;
+    font-size: 12px;
+    color: var(--muted-color);
+}
+
+/* Form Elements */
+.form-group {
+    margin-bottom: 20px;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.form-control {
+    width: 100%;
+    padding: 12px 15px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    font-size: 16px;
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    transition: all 0.3s;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 2px var(--primary-focus, rgba(108, 92, 231, 0.2));
+}
+
+/* Theme Selector */
+.theme-selector {
+    display: flex;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.theme-option {
+    flex: 1;
+    border: 2px solid var(--border-color);
+    border-radius: 10px;
+    padding: 15px;
+    cursor: pointer;
+    transition: all 0.3s;
+    text-align: center;
+    background-color: transparent;
+}
+
+.theme-option:hover,
+.theme-option.selected {
+    border-color: var(--primary);
+    background-color: var(--primary-transparent, rgba(108, 92, 231, 0.05));
+}
+
+.theme-option i {
+    font-size: 24px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.theme-option.light {
+    color: #2d3436;
+    background-color: #ffffff;
+}
+
+.theme-option.dark {
+    color: #f5f6fa;
+    background-color: #2d3436;
+}
+
+/* Save Button */
+.save-btn {
+    margin-top: 30px;
+    width: 100%;
+    padding: 15px;
+    font-size: 16px;
+}
+
+/* Responsive */
+@media (max-width: 992px) {
+    .profile-header {
+        flex-direction: column;
+        text-align: center;
+    }
+
+    .profile-avatar {
+        margin-right: 0;
+        margin-bottom: 20px;
+    }
+
+    .theme-selector {
+        flex-direction: column;
+    }
+}
