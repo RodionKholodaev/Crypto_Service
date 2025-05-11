@@ -7,7 +7,7 @@ class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
     name = forms.CharField(max_length=100, required=True)
 
-    class Meta:
+    class Meta: # meta позволяет создать связь с моделью и указать дополнительные параметры
         model = User
         fields = ('name', 'email', 'password1', 'password2')
 
