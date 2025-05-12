@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'sendbox',
     'strategies',
     'users',
+    'encrypted_model_fields', # для шифрования
     'django.contrib.admin', # создает автоматический интерфейс для управленя данными
     'django.contrib.auth', # добавляет систему входа/регистрации, проверку паролей
     'django.contrib.contenttypes', # позволяет связывать разные таблицы в бд между собой
@@ -164,3 +165,5 @@ LOGIN_REDIRECT_URL = 'home' # после входа на сайт перенап
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend', # стандартный
 ]
+
+FIELD_ENCRYPTION_KEY=os.getenv('FIELD_ENCRYPTION_KEY') # ключ для шифрования
