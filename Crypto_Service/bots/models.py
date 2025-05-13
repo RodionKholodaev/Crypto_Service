@@ -77,6 +77,7 @@ class Deal(models.Model):
     volume=models.DecimalField(max_digits=20, decimal_places=8)
     pnl=models.DecimalField(max_digits=20, decimal_places=8)
     trading_pair=models.CharField(max_length=30)
+    order_id = models.CharField(max_length=100, null=True, blank=True)  # ID ордера на Bybit
 
 
 

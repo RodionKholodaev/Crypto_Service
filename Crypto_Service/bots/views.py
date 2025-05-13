@@ -1,3 +1,5 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
-# Create your views here.
+def bot_conf(request):
+    return render(request,'bots/bot_conf.html')
+        

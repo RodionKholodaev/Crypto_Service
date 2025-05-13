@@ -6,6 +6,7 @@ urlpatterns = [
     path('login/', views.login_view,name='login'),
     path('home/', views.home_view, name='home'),
     path('profile/',views.profile,name='profile'),
+    path('bot_conf/',include('bots.urls'), name='bot_creation'),
     
 ]
 
