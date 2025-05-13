@@ -72,4 +72,11 @@ class Deal(models.Model):
     stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    exchange_commission=models.DecimalField(max_digits=20, decimal_places=8)
+    service_commission=models.DecimalField(max_digits=20, decimal_places=8)
+    volume=models.DecimalField(max_digits=20, decimal_places=8)
+    pnl=models.DecimalField(max_digits=20, decimal_places=8)
+    trading_pair=models.CharField(max_length=30)
+
+
+
