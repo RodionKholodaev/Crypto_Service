@@ -3,6 +3,8 @@ from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
 from .models import User
 
+from bots.models import ExchangeAccount
+
 class RegisterForm(UserCreationForm):
     email = forms.EmailField(required=True)
     name = forms.CharField(max_length=100, required=True)
@@ -34,3 +36,30 @@ class ProfileForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['name'].required = False
+
+
+
+#форма для ввода api ключей
+class ExchangeAccountForm(forms.ModelForm):
+    class Meta:
+        model = ExchangeAccount
+        fields = ['name', 'api_key', 'api_secret']
+        widgets = {
+            'api_key': forms.PasswordInput(render_value=True),
+            'api_secret': forms.PasswordInput(render_value=True),
+        }
+        labels = {
+            'name': 'Название ключа',
+            'api_key': 'API Key',
+            'api_secret': 'API Secret',
+        }
+
+
+#форма для редактирования api ключей
+class EditExchangeAccountForm(forms.ModelForm):
+    class Meta:
+        model = ExchangeAccount
+        fields = ['name']  # Только поле названия
+        labels = {
+            'name': 'Новое название ключа',
+        }

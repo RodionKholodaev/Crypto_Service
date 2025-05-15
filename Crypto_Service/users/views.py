@@ -4,6 +4,9 @@ from .forms import RegisterForm
 from .forms import ProfileForm
 from django.contrib import messages
 
+from bots.models import ExchangeAccount
+from .forms import ExchangeAccountForm, EditExchangeAccountForm
+
 def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
@@ -34,9 +37,69 @@ def login_view(request):
     return render(request, 'users/login.html', {'messages': messages.get_messages(request)})
 
 
+# def home_view(request):
+#     user=request.user
+#     return render(request, 'users/home.html',{'user':user})
+
+
 def home_view(request):
-    user=request.user
-    return render(request, 'users/home.html',{'user':user})
+    user = request.user
+    
+    if request.method == 'POST':
+        if 'delete_key' in request.POST:
+            # Удаление ключа (оставляем без изменений)
+            key_id = request.POST.get('delete_key')
+            if key_id:
+                ExchangeAccount.objects.filter(id=key_id, user=user).delete()
+                messages.success(request, 'Ключ успешно удален')
+            return redirect('home')
+        
+        if 'edit_key' in request.POST:
+            # Редактирование названия ключа
+            key_id = request.POST.get('edit_key')
+            if key_id:
+                try:
+                    key = ExchangeAccount.objects.get(id=key_id, user=user)
+                    form = EditExchangeAccountForm(request.POST, instance=key)
+                    if form.is_valid():
+                        form.save()
+                        messages.success(request, 'Название ключа успешно изменено')
+                        return redirect('home')
+                except ExchangeAccount.DoesNotExist:
+                    messages.error(request, 'Ключ не найден')
+                    return redirect('home')
+        
+        else:
+            # Создание нового ключа (оставляем без изменений)
+            form = ExchangeAccountForm(request.POST)
+            if form.is_valid():
+                new_key = form.save(commit=False)
+                new_key.user = user
+                new_key.exchange = 'bybit'
+                new_key.save()
+                messages.success(request, 'Ключ успешно добавлен')
+                return redirect('home')
+    
+    # Для GET-запросов
+    form = ExchangeAccountForm()  # Форма для создания ключа
+    edit_form = EditExchangeAccountForm()  # Форма для редактирования названия
+    
+    api_keys = ExchangeAccount.objects.filter(user=user)
+    
+    return render(request, 'users/home.html', {
+        'user': user,
+        'form': form,
+        'edit_form': edit_form,
+        'api_keys': api_keys,
+    })
+
+
+
+
+
+
+
+
 
 
 def profile(request):

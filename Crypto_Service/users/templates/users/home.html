@@ -125,34 +125,116 @@
                     <div class="card-title">API Ключи</div>
                     <i class="fas fa-key" style="color: var(--danger);"></i>
                 </div>
-                <button class="btn btn-outline" style="margin-top: 15px;"><i class="fas fa-plus"></i> Добавить ключ</button>
+                
+                <!-- Форма для добавления ключа -->
+                <div id="apiKeyFormContainer" style="display: none; margin-top: 15px; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <form id="apiKeyForm" method="POST">
+                        {% csrf_token %}
+                        <div class="form-group">
+                            <label for="id_name">Название ключа</label>
+                            {{ form.name }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_api_key">API Key</label>
+                            {{ form.api_key }}
+                        </div>
+                        <div class="form-group">
+                            <label for="id_api_secret">API Secret</label>
+                            {{ form.api_secret }}
+                        </div>
+                        <div class="form-actions" style="margin-top: 15px;">
+                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                            <button type="button" id="cancelFormBtn" class="btn btn-outline">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Форма для редактирования названия (изначально скрыта) -->
+                <div id="editNameFormContainer" style="display: none; margin-top: 15px; padding: 15px; background: var(--card-bg); border-radius: 8px;">
+                    <form id="editNameForm" method="POST">
+                        {% csrf_token %}
+                        <input type="hidden" name="edit_key" id="editKeyId" value="">
+                        <div class="form-group">
+                            <label for="id_name">Новое название</label>
+                            {{ edit_form.name }}
+                        </div>
+                        <div class="form-actions" style="margin-top: 15px;">
+                            <button type="submit" class="btn btn-primary">Сохранить</button>
+                            <button type="button" id="cancelEditNameBtn" class="btn btn-outline">Отмена</button>
+                        </div>
+                    </form>
+                </div>
+                
+                <!-- Кнопка добавления ключа -->
+                <button id="addKeyBtn" class="btn btn-outline" style="margin-top: 15px;">
+                    <i class="fas fa-plus"></i> Добавить ключ
+                </button>
+                
+                <!-- Список API ключей -->
                 <div class="api-keys-list">
+                    {% for key in api_keys %}
                     <div class="api-key-item">
                         <div class="api-key-info">
-                            <div class="api-key-name">Binance Main Key</div>
-                            <div class="api-key-exchange">Binance Futures</div>
+                            <div class="api-key-name">{{ key.name }}</div>
+                            <div class="api-key-exchange">{{ key.get_exchange_display }}</div>
                         </div>
                         <div class="api-key-actions">
-                            <button class="btn btn-outline"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-outline"><i class="fas fa-trash"></i></button>
+                            <button class="btn btn-outline edit-name-btn" data-key-id="{{ key.id }}" data-key-name="{{ key.name }}">
+                                <i class="fas fa-edit"></i>
+                            </button>
+                            <form method="POST" style="display: inline;">
+                                {% csrf_token %}
+                                <input type="hidden" name="delete_key" value="{{ key.id }}">
+                                <button type="submit" class="btn btn-outline" onclick="return confirm('Вы уверены, что хотите удалить этот ключ?')">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
                         </div>
                     </div>
-                    <div class="api-key-item">
-                        <div class="api-key-info">
-                            <div class="api-key-name">Bybit Trading</div>
-                            <div class="api-key-exchange">Bybit Spot</div>
-                        </div>
-                        <div class="api-key-actions">
-                            <button class="btn btn-outline"><i class="fas fa-edit"></i></button>
-                            <button class="btn btn-outline"><i class="fas fa-trash"></i></button>
-                        </div>
+                    {% empty %}
+                    <div style="padding: 15px; text-align: center; color: var(--text-muted);">
+                        Нет добавленных API ключей
                     </div>
+                    {% endfor %}
                 </div>
             </div>
         </main>
     </div>
 
     <script>
+        // Обработчики для формы API ключей
+            document.getElementById('addKeyBtn').addEventListener('click', function() {
+            document.getElementById('apiKeyFormContainer').style.display = 'block';
+            document.getElementById('addKeyBtn').style.display = 'none';
+            document.getElementById('apiKeyForm').reset();
+        });
+
+        document.getElementById('cancelFormBtn').addEventListener('click', function() {
+            document.getElementById('apiKeyFormContainer').style.display = 'none';
+            document.getElementById('addKeyBtn').style.display = 'block';
+        });
+
+        // Обработчики для формы редактирования названия
+        document.querySelectorAll('.edit-name-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                const keyId = this.getAttribute('data-key-id');
+                const keyName = this.getAttribute('data-key-name');
+                
+                document.getElementById('editKeyId').value = keyId;
+                document.getElementById('id_name').value = keyName;
+                
+                document.getElementById('editNameFormContainer').style.display = 'block';
+                document.getElementById('addKeyBtn').style.display = 'none';
+            });
+        });
+
+        document.getElementById('cancelEditNameBtn').addEventListener('click', function() {
+            document.getElementById('editNameFormContainer').style.display = 'none';
+            document.getElementById('addKeyBtn').style.display = 'block';
+        });
+
+
+
         // Обработчик выбора сети
         document.getElementById('networkSelect').addEventListener('change', function() {
             console.log('Выбрана сеть:', this.value);
