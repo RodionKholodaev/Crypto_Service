@@ -5,11 +5,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Создание бота | CryptoBotHub</title>
-
     <link rel="stylesheet" href="{% static 'bots/css/style.css' %}">
-
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-
 </head>
 <body>
     <div class="container">
@@ -18,22 +15,18 @@
             <a href="{% url 'home' %}" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Назад</a>
         </div>
         
-        <form class="bot-creation-form">
+        <form class="bot-creation-form" method="post" action="{% url 'create_bot' %}">
+            {% csrf_token %}
             <!-- API Key Section -->
             <div class="form-section">
                 <div class="form-group">
                     <label class="form-label">API Ключ</label>
                     <div class="dropdown">
-                        <button type="button" class="dropdown-toggle" id="apiKeyDropdown">
-                            <span id="selectedApiKey">Binance Main Key</span>
-                            <i class="fas fa-chevron-down"></i>
-                        </button>
-                        <div class="dropdown-menu" id="apiKeyMenu">
-                            <div class="dropdown-item" onclick="selectApiKey('Binance Main Key')">Binance Main Key</div>
-                            <div class="dropdown-item" onclick="selectApiKey('Bybit Trading')">Bybit Trading</div>
-                            <div class="dropdown-item" onclick="selectApiKey('OKX Futures Key')">OKX Futures Key</div>
-                            <div class="dropdown-item" onclick="selectApiKey('Добавить новый ключ')"><i class="fas fa-plus"></i> Добавить новый ключ</div>
-                        </div>
+                        <select name="exchange_account" class="form-control" required id="apiKeySelect">
+                            {% for account in exchange_accounts %}
+                                <option value="{{ account.id }}">{{ account.name }} ({{ account.get_exchange_display }})</option>
+                            {% endfor %}
+                        </select>
                     </div>
                 </div>
             </div>
@@ -44,63 +37,55 @@
                 <div class="form-group">
                     <label class="form-label">Алгоритм торговли</label>
                     <div class="mode-selector">
-                        <div class="mode-option active" onclick="selectMode(this, 'long')">
+                        <div class="mode-option {% if not form.strategy.value or form.strategy.value == 'True' %}active{% endif %}" onclick="selectMode(this, 'long')">
                             <h4>Long</h4>
                             <p>Покупка с ожиданием роста</p>
                         </div>
-                        <div class="mode-option" onclick="selectMode(this, 'short')">
+                        <div class="mode-option {% if form.strategy.value == 'False' %}active{% endif %}" onclick="selectMode(this, 'short')">
                             <h4>Short</h4>
                             <p>Продажа с ожиданием падения</p>
                         </div>
                     </div>
-                    <input type="hidden" id="tradingMode" value="long">
+                    <input type="hidden" name="strategy" id="tradingMode" value="{% if not form.strategy.value or form.strategy.value == 'True' %}True{% else %}False{% endif %}">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Торговая пара</label>
                     <div class="pair-selector">
                         <div class="dropdown" style="flex: 1;">
-                            <button type="button" class="dropdown-toggle" id="baseCurrencyDropdown">
-                                <span id="selectedBaseCurrency">BTC</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                            <div class="dropdown-menu" id="baseCurrencyMenu">
-                                <div class="dropdown-item" onclick="selectCurrency('BTC', 'base')">BTC</div>
-                                <div class="dropdown-item" onclick="selectCurrency('ETH', 'base')">ETH</div>
-                                <div class="dropdown-item" onclick="selectCurrency('BNB', 'base')">BNB</div>
-                                <div class="dropdown-item" onclick="selectCurrency('SOL', 'base')">SOL</div>
-                                <div class="dropdown-item" onclick="selectCurrency('XRP', 'base')">XRP</div>
-                                <div class="dropdown-item" onclick="selectCurrency('Другая', 'base')">Другая</div>
-                            </div>
+                            <select name="base_currency" class="form-control" id="baseCurrencySelect">
+                                <option value="BTC">BTC</option>
+                                <option value="ETH">ETH</option>
+                                <option value="BNB">BNB</option>
+                                <option value="SOL">SOL</option>
+                                <option value="XRP">XRP</option>
+                                <option value="CUSTOM">Другая</option>
+                            </select>
                         </div>
                         <span class="pair-divider">/</span>
                         <div class="dropdown" style="flex: 1;">
-                            <button type="button" class="dropdown-toggle" id="quoteCurrencyDropdown">
-                                <span id="selectedQuoteCurrency">USDT</span>
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                            <div class="dropdown-menu" id="quoteCurrencyMenu">
-                                <div class="dropdown-item" onclick="selectCurrency('USDT', 'quote')">USDT</div>
-                                <div class="dropdown-item" onclick="selectCurrency('BUSD', 'quote')">BUSD</div>
-                                <div class="dropdown-item" onclick="selectCurrency('BTC', 'quote')">BTC</div>
-                                <div class="dropdown-item" onclick="selectCurrency('ETH', 'quote')">ETH</div>
-                                <div class="dropdown-item" onclick="selectCurrency('Другая', 'quote')">Другая</div>
-                            </div>
+                            <select name="quote_currency" class="form-control" id="quoteCurrencySelect">
+                                <option value="USDT">USDT</option>
+                                <option value="BUSD">BUSD</option>
+                                <option value="BTC">BTC</option>
+                                <option value="ETH">ETH</option>
+                                <option value="CUSTOM">Другая</option>
+                            </select>
                         </div>
                     </div>
                     <div id="customCurrencyInput" style="display: none; margin-top: 10px;">
-                        <input type="text" class="form-control" placeholder="Введите код валюты (например: ADA)">
+                        <input type="text" class="form-control" name="custom_currency" placeholder="Введите код валюты (например: ADA)">
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Размер депозита (USDT)</label>
-                    <input type="number" class="form-control" placeholder="1000" min="0" step="0.01">
+                    <input type="number" class="form-control" name="deposit" placeholder="1000" min="0" step="0.01" required value="{{ form.deposit.value|default_if_none:'' }}">
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Плечо <span id="leverageValue">10x</span></label>
-                    <input type="range" min="1" max="50" value="10" class="leverage-slider" id="leverageSlider">
+                    <input type="range" min="1" max="50" value="{{ form.bot_leverage.value|default_if_none:'10' }}" class="leverage-slider" id="leverageSlider" name="bot_leverage">
                     <div class="leverage-values">
                         <span>1x</span>
                         <span>10x</span>
@@ -114,20 +99,19 @@
                 <div class="form-group">
                     <label class="form-label">Режим торговли</label>
                     <div class="mode-selector">
-                        <div class="mode-option active" onclick="selectTradingStyle(this, 'conservative')">
+                        <div class="mode-option {% if not form.grid_overlap_percent.value or form.grid_overlap_percent.value == '40' %}active{% endif %}" onclick="selectTradingStyle(this, 'conservative')">
                             <h4>Консервативный</h4>
                             <p>Меньше сделок, ниже риск</p>
                         </div>
-                        <div class="mode-option" onclick="selectTradingStyle(this, 'moderate')">
+                        <div class="mode-option {% if form.grid_overlap_percent.value == '25' %}active{% endif %}" onclick="selectTradingStyle(this, 'moderate')">
                             <h4>Умеренный</h4>
                             <p>Баланс риска и прибыли</p>
                         </div>
-                        <div class="mode-option" onclick="selectTradingStyle(this, 'aggressive')">
+                        <div class="mode-option {% if form.grid_overlap_percent.value == '15' %}active{% endif %}" onclick="selectTradingStyle(this, 'aggressive')">
                             <h4>Агрессивный</h4>
                             <p>Больше сделок, выше риск</p>
                         </div>
                     </div>
-                    <input type="hidden" id="tradingStyle" value="conservative">
                 </div>
                 
                 <!-- Grid Settings -->
@@ -141,7 +125,7 @@
                                     <span class="tooltiptext">Какой процент цены будет покрывать сетка</span>
                                 </div>
                             </label>
-                            <input type="number" class="form-control" id="orderOverlap" placeholder="40" min="0.5" max="99" step="0.1" value="40">
+                            <input type="number" class="form-control" id="orderOverlap" name="grid_overlap_percent" placeholder="40" min="0.5" max="99" step="0.1" value="{{ form.grid_overlap_percent.value|default_if_none:'40' }}">
                         </div>
                     </div>
                     
@@ -154,14 +138,14 @@
                                     <span class="tooltiptext">Количество ордеров в сетке</span>
                                 </div>
                             </label>
-                            <input type="number" class="form-control" id="orderGridCount" placeholder="20" min="2" max="60" step="1" value="20">
+                            <input type="number" class="form-control" id="orderGridCount" name="grid_orders_count" placeholder="20" min="2" max="60" step="1" value="{{ form.grid_orders_count.value|default_if_none:'20' }}">
                         </div>
                     </div>
                 </div>
                 
                 <div class="form-group">
                     <label class="form-label">Название бота</label>
-                    <input type="text" class="form-control" placeholder="Мой прибыльный бот">
+                    <input type="text" class="form-control" name="name" placeholder="Мой прибыльный бот" required value="{{ form.name.value|default_if_none:'' }}">
                 </div>
             </div>
             
@@ -170,51 +154,38 @@
                 <h2 class="section-title"><i class="fas fa-chart-line"></i> Индикаторы для входа</h2>
                 
                 <div id="indicatorsContainer">
+                    {% for indicator in form.indicators %}
                     <div class="indicator-form">
+                        {{ indicator.id }}
                         <div class="indicator-row">
                             <div class="form-group">
                                 <label class="form-label">Индикатор</label>
-                                <select class="form-control">
-                                    <option value="rsi">RSI</option>
-                                    <option value="macd">MACD</option>
-                                    <option value="ma">Moving Average</option>
-                                    <option value="bollinger">Bollinger Bands</option>
-                                    <option value="stochastic">Stochastic</option>
-                                </select>
+                                {{ indicator.indicator_type }}
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label">Таймфрейм</label>
-                                <select class="form-control">
-                                    <!-- Добавлены новые таймфреймы -->
-                                    <option value="1m">1 минута</option>
-                                    <option value="5m">5 минут</option>
-                                    <option value="15m">15 минут</option>
-                                    <option value="30m">30 минут</option>
-                                    <option value="1h">1 час</option>
-                                    <option value="4h">4 часа</option>
-                                    <option value="1d">1 день</option>
-                                </select>
+                                {{ indicator.timeframe }}
                             </div>
                         </div>
                         
                         <div class="indicator-row">
                             <div class="form-group">
                                 <label class="form-label">Условие</label>
-                                <select class="form-control">
-                                    <option value="lt"><</option>
-                                    <option value="lte"><=</option>
-                                    <option value="gt">></option>
-                                    <option value="gte">>=</option>
-                                </select>
+                                {{ indicator.condition }}
                             </div>
                             
                             <div class="form-group">
                                 <label class="form-label">Значение</label>
-                                <input type="number" class="form-control" placeholder="30" step="0.1">
+                                {{ indicator.value }}
                             </div>
                         </div>
+                        
+                        <button type="button" class="btn btn-outline" onclick="this.parentNode.remove()" style="margin-top: 10px;">
+                            <i class="fas fa-trash"></i> Удалить индикатор
+                        </button>
                     </div>
+                    {% endfor %}
                 </div>
                 
                 <button type="button" class="btn btn-outline add-indicator-btn" onclick="addIndicator()">
@@ -230,7 +201,7 @@
                     <div class="grid-setting">
                         <div class="form-group">
                             <label class="form-label">Take Profit (%)</label>
-                            <input type="number" class="form-control" placeholder="5" min="0.1" max="100" step="0.1">
+                            <input type="number" class="form-control" name="take_profit_percent" placeholder="5" min="0.1" max="100" step="0.1" required value="{{ form.take_profit_percent.value|default_if_none:'' }}">
                         </div>
                     </div>
                     
@@ -239,13 +210,12 @@
                             <label class="form-label">
                                 Добавить Stop Loss
                                 <label class="toggle-switch">
-                                    <input type="checkbox" id="stopLossToggle">
+                                    <input type="checkbox" id="stopLossToggle" {% if form.stop_loss_percent.value %}checked{% endif %}>
                                     <span class="slider"></span>
                                 </label>
                             </label>
-                            <!-- Контейнер для поля Stop Loss, который будет показываться только при включенном переключателе -->
-                            <div class="stop-loss-container" id="stopLossContainer">
-                                <input type="number" class="form-control" id="stopLossValue" placeholder="2" min="0.1" max="100" step="0.1">
+                            <div class="stop-loss-container" id="stopLossContainer" style="display: {% if form.stop_loss_percent.value %}block{% else %}none{% endif %};">
+                                <input type="number" class="form-control" name="stop_loss_percent" id="stopLossValue" placeholder="2" min="0.1" max="100" step="0.1" value="{{ form.stop_loss_percent.value|default_if_none:'' }}">
                             </div>
                         </div>
                     </div>
@@ -262,54 +232,37 @@
     </div>
 
     <script>
-        // API Key dropdown
-        document.getElementById('apiKeyDropdown').addEventListener('click', function() {
-            document.getElementById('apiKeyMenu').classList.toggle('show');
-        });
-        
-        // Base currency dropdown
-        document.getElementById('baseCurrencyDropdown').addEventListener('click', function() {
-            document.getElementById('baseCurrencyMenu').classList.toggle('show');
-        });
-        
-        // Quote currency dropdown
-        document.getElementById('quoteCurrencyDropdown').addEventListener('click', function() {
-            document.getElementById('quoteCurrencyMenu').classList.toggle('show');
-        });
-        
-        // Close dropdowns when clicking outside
-        window.onclick = function(event) {
-            if (!event.target.matches('.dropdown-toggle')) {
-                var dropdowns = document.getElementsByClassName("dropdown-menu");
-                for (var i = 0; i < dropdowns.length; i++) {
-                    var openDropdown = dropdowns[i];
-                    if (openDropdown.classList.contains('show')) {
-                        openDropdown.classList.remove('show');
-                    }
-                }
+        // Initialize leverage value display
+        document.addEventListener('DOMContentLoaded', function() {
+            const leverageSlider = document.getElementById('leverageSlider');
+            document.getElementById('leverageValue').textContent = leverageSlider.value + 'x';
+            
+            // Check if custom currency is needed
+            const baseCurrency = document.getElementById('baseCurrencySelect');
+            const quoteCurrency = document.getElementById('quoteCurrencySelect');
+            
+            if (baseCurrency.value === 'CUSTOM' || quoteCurrency.value === 'CUSTOM') {
+                document.getElementById('customCurrencyInput').style.display = 'block';
             }
-        }
+        });
         
-        // Select API key
-        function selectApiKey(name) {
-            document.getElementById('selectedApiKey').textContent = name;
-            document.getElementById('apiKeyMenu').classList.remove('show');
-        }
+        // Leverage slider
+        document.getElementById('leverageSlider').addEventListener('input', function() {
+            document.getElementById('leverageValue').textContent = this.value + 'x';
+        });
         
         // Select trading mode (long/short)
         function selectMode(element, mode) {
             document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('active'));
             element.classList.add('active');
-            document.getElementById('tradingMode').value = mode;
+            document.getElementById('tradingMode').value = mode === 'long' ? 'True' : 'False';
         }
         
         // Select trading style (conservative/moderate/aggressive)
         function selectTradingStyle(element, style) {
             document.querySelectorAll('.mode-option').forEach(opt => opt.classList.remove('active'));
             element.classList.add('active');
-            document.getElementById('tradingStyle').value = style;
             
-            // Set grid settings based on trading style
             const orderOverlap = document.getElementById('orderOverlap');
             const orderGridCount = document.getElementById('orderGridCount');
             
@@ -329,33 +282,21 @@
             }
         }
         
-        // Select currency
-        function selectCurrency(currency, type) {
-            if (type === 'base') {
-                document.getElementById('selectedBaseCurrency').textContent = currency;
-                document.getElementById('baseCurrencyMenu').classList.remove('show');
-            } else {
-                document.getElementById('selectedQuoteCurrency').textContent = currency;
-                document.getElementById('quoteCurrencyMenu').classList.remove('show');
-            }
-            
-            if (currency === 'Другая') {
+        // Handle custom currency selection
+        document.getElementById('baseCurrencySelect').addEventListener('change', function() {
+            if (this.value === 'CUSTOM') {
                 document.getElementById('customCurrencyInput').style.display = 'block';
             } else {
                 document.getElementById('customCurrencyInput').style.display = 'none';
             }
-        }
-        
-        // Leverage slider
-        document.getElementById('leverageSlider').addEventListener('input', function() {
-            document.getElementById('leverageValue').textContent = this.value + 'x';
         });
         
-        // Prevent negative values in number inputs
-        document.querySelectorAll('input[type="number"]').forEach(input => {
-            input.addEventListener('change', function() {
-                if (this.value < 0) this.value = 0;
-            });
+        document.getElementById('quoteCurrencySelect').addEventListener('change', function() {
+            if (this.value === 'CUSTOM') {
+                document.getElementById('customCurrencyInput').style.display = 'block';
+            } else {
+                document.getElementById('customCurrencyInput').style.display = 'none';
+            }
         });
         
         // Add new indicator form
@@ -367,18 +308,18 @@
                 <div class="indicator-row">
                     <div class="form-group">
                         <label class="form-label">Индикатор</label>
-                        <select class="form-control">
-                            <option value="rsi">RSI</option>
-                            <option value="macd">MACD</option>
-                            <option value="ma">Moving Average</option>
-                            <option value="bollinger">Bollinger Bands</option>
-                            <option value="stochastic">Stochastic</option>
+                        <select name="indicators-__prefix__-indicator_type" class="form-control">
+                            <option value="RSI">RSI</option>
+                            <option value="MACD">MACD</option>
+                            <option value="MA">Moving Average</option>
+                            <option value="BOLL">Bollinger Bands</option>
+                            <option value="STOCH">Stochastic</option>
                         </select>
                     </div>
                     
                     <div class="form-group">
                         <label class="form-label">Таймфрейм</label>
-                        <select class="form-control">
+                        <select name="indicators-__prefix__-timeframe" class="form-control">
                             <option value="1m">1 минута</option>
                             <option value="5m">5 минут</option>
                             <option value="15m">15 минут</option>
@@ -393,7 +334,7 @@
                 <div class="indicator-row">
                     <div class="form-group">
                         <label class="form-label">Условие</label>
-                        <select class="form-control">
+                        <select name="indicators-__prefix__-condition" class="form-control">
                             <option value="lt"><</option>
                             <option value="lte"><=</option>
                             <option value="gt">></option>
@@ -403,7 +344,7 @@
                     
                     <div class="form-group">
                         <label class="form-label">Значение</label>
-                        <input type="number" class="form-control" placeholder="30" step="0.1">
+                        <input type="number" name="indicators-__prefix__-value" class="form-control" placeholder="30" step="0.1">
                     </div>
                 </div>
                 
@@ -412,6 +353,11 @@
                 </button>
             `;
             container.appendChild(newIndicator);
+            
+            // Update the form prefix for Django formsets
+            const totalForms = document.getElementById('id_indicators-TOTAL_FORMS');
+            totalForms.value = parseInt(totalForms.value) + 1;
+            newIndicator.innerHTML = newIndicator.innerHTML.replace(/__prefix__/g, totalForms.value - 1);
         }
         
         // Toggle Stop Loss field visibility

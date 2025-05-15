@@ -4,13 +4,22 @@ from encrypted_model_fields.fields import EncryptedCharField
 
 # модель для хранения api ключей
 class ExchangeAccount(models.Model):
+    EXCHANGE_CHOICES = [
+        ('binance', 'Binance'),
+        ('bybit', 'Bybit'),
+        ('okx', 'OKX'),
+    ]
+    
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='exchange_accounts')
     name = models.CharField(max_length=100)  # Произвольное название для удобства
-    exchange = models.CharField(max_length=50)  # Binance, Bybit и т.д.
+    exchange = models.CharField(max_length=50, choices=EXCHANGE_CHOICES) # Binance, Bybit и т.д.
     api_key = EncryptedCharField(max_length=255)
     api_secret = EncryptedCharField(max_length=255)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    
+    def __str__(self):
+        return f"{self.name} ({self.exchange})"
 
 
 
