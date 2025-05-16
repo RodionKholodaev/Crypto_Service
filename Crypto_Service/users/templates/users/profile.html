@@ -86,7 +86,7 @@
                         <input type="email" id="id_email" class="form-control" value="{{ user.email }}" disabled>
                     </div>
 
-                    <h3 style="margin: 25px 0 15px;">Выбор темы</h3>
+                    <h3>Тема</h3>
                     <div class="theme-selector">
                         <div class="theme-option light {% if not user.theme %}selected{% endif %}" data-theme="light">
                             <i class="fas fa-sun"></i>
@@ -101,7 +101,7 @@
                     </div>
 
                     <button type="submit" class="btn btn-primary save-btn">
-                        <i class="fas fa-save"></i> Сохранить изменения
+                        <i class="fas fa-save"></i> Сохранить
                     </button>
                 </div>
             </form>
@@ -145,7 +145,6 @@
                 
                 setTimeout(() => {
                     toast.style.opacity = '0';
-                    location.href = location.pathname;  // перезагрузка без параметров ?success
                 }, 1000);
             }
         });
