@@ -1,11 +1,19 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login
-from .forms import RegisterForm
-from .forms import ProfileForm
+from .forms import RegisterForm, ProfileForm
 from django.contrib import messages
 
 from bots.models import ExchangeAccount
 from .forms import ExchangeAccountForm, EditExchangeAccountForm
+
+from .forms import PasswordResetRequestForm, PasswordResetVerifyForm
+from .models import PasswordResetCode
+from .utils import generate_reset_code
+from django.core.mail import send_mail
+
+from .forms import SetNewPasswordForm
+from .models import User
+
 
 def register_view(request):
     if request.method == 'POST':
@@ -93,15 +101,6 @@ def home_view(request):
         'api_keys': api_keys,
     })
 
-
-
-
-
-
-
-
-
-
 def profile(request):
     if request.method == 'POST':
         form = ProfileForm(request.POST, request.FILES, instance=request.user)
@@ -112,3 +111,71 @@ def profile(request):
         form = ProfileForm(instance=request.user)
     
     return render(request, 'users/profile.html', {'form': form, 'user': request.user})
+
+def password_reset_request_view(request):
+    if request.method == 'POST':
+        form = PasswordResetRequestForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            code = generate_reset_code()
+
+            PasswordResetCode.objects.create(email=email, code=code)
+
+            send_mail(
+                'Восстановление доступа',
+                f'Ваш код восстановления: {code}',
+                None,
+                [email],
+                fail_silently=False,
+            )
+
+            messages.success(request, 'Код отправлен на вашу почту')
+            return redirect('verify_reset_code')
+    else:
+        form = PasswordResetRequestForm()
+
+    return render(request, 'users/password_reset_request.html', {'form': form})
+
+
+def password_reset_verify_view(request):
+    if request.method == 'POST':
+        form = PasswordResetVerifyForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            code = form.cleaned_data['code']
+
+            try:
+                reset_entry = PasswordResetCode.objects.filter(email=email, code=code).latest('created_at')
+                if reset_entry.is_valid():
+                    messages.success(request, 'Код подтверждён. Можно сбросить пароль.')
+                    return redirect(f'/users/set-new-password/?email={email}')
+                else:
+                    messages.error(request, 'Код истёк.')
+            except PasswordResetCode.DoesNotExist:
+                messages.error(request, 'Неверный код.')
+    else:
+        form = PasswordResetVerifyForm()
+
+    return render(request, 'users/password_reset_verify.html', {'form': form})
+
+
+def set_new_password_view(request):
+    if request.method == 'POST':
+        form = SetNewPasswordForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            password = form.cleaned_data['password1']
+            try:
+                user = User.objects.get(email=email)
+                user.set_password(password)
+                user.save()
+                messages.success(request, 'Пароль успешно обновлён. Войдите с новым паролем.')
+                return redirect('login')
+            except User.DoesNotExist:
+                messages.error(request, 'Пользователь не найден.')
+    else:
+        # email должен быть передан как GET параметр
+        email = request.GET.get('email')
+        form = SetNewPasswordForm(initial={'email': email})
+
+    return render(request, 'users/password_reset_set_password.html', {'form': form})

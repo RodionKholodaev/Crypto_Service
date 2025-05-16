@@ -2,6 +2,8 @@ from django.db import models
 from django.core.validators import FileExtensionValidator
 from django.contrib.auth.models import AbstractUser
 from django.core.validators import MinValueValidator
+from django.utils import timezone
+from datetime import timedelta
 
 class User(AbstractUser):
     username = models.CharField(max_length=150, blank=True, null=True, unique=True)
@@ -24,3 +26,14 @@ class User(AbstractUser):
 
     def __str__(self):
         return self.email
+
+class PasswordResetCode(models.Model):
+    email = models.EmailField()
+    code = models.CharField(max_length=6)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def is_valid(self):
+        return timezone.now() < self.created_at + timedelta(minutes=10)
+
+    def __str__(self):
+        return f"{self.email} - {self.code}"

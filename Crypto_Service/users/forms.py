@@ -63,3 +63,46 @@ class EditExchangeAccountForm(forms.ModelForm):
         labels = {
             'name': 'Новое название ключа',
         }
+
+class PasswordResetRequestForm(forms.Form):
+    email = forms.EmailField(
+        label="Email",
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите ваш email',
+            'id': 'email',
+        })
+    )
+
+class PasswordResetVerifyForm(forms.Form):
+    email = forms.EmailField(label="Email")
+    code = forms.CharField(label="Код", max_length=6)
+
+class SetNewPasswordForm(forms.Form):
+    email = forms.EmailField(widget=forms.HiddenInput())
+    password1 = forms.CharField(
+        label="Новый пароль",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Введите новый пароль',
+            'id': 'password1',
+        }),
+        min_length=8
+    )
+    password2 = forms.CharField(
+        label="Повторите пароль",
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Повторите новый пароль',
+            'id': 'password2',
+        }),
+        min_length=8
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        password1 = cleaned_data.get("password1")
+        password2 = cleaned_data.get("password2")
+
+        if password1 and password2 and password1 != password2:
+            raise forms.ValidationError("Пароли не совпадают")

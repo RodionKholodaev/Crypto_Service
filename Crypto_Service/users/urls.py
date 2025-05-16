@@ -7,6 +7,8 @@ urlpatterns = [
     path('home/', views.home_view, name='home'),
     path('profile/',views.profile,name='profile'),
     path('bot_conf/',include('bots.urls'), name='bot_creation'),
-    
+    path('password-reset/', views.password_reset_request_view, name='password_reset'),
+    path('verify-reset-code/', views.password_reset_verify_view, name='verify_reset_code'),
+    path('set-new-password/', views.set_new_password_view, name='set_new_password'),
 ]
 
