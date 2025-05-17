@@ -129,6 +129,9 @@ def password_reset_request_view(request):
                 fail_silently=False,
             )
 
+            # Сохраняем email в сессии
+            request.session['reset_email'] = email
+
             messages.success(request, 'Код отправлен на вашу почту')
             return redirect('verify_reset_code')
     else:
@@ -141,14 +144,14 @@ def password_reset_verify_view(request):
     if request.method == 'POST':
         form = PasswordResetVerifyForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email']
+            email = request.session.get('reset_email')
             code = form.cleaned_data['code']
 
             try:
                 reset_entry = PasswordResetCode.objects.filter(email=email, code=code).latest('created_at')
                 if reset_entry.is_valid():
                     messages.success(request, 'Код подтверждён. Можно сбросить пароль.')
-                    return redirect(f'/users/set-new-password/?email={email}')
+                    return redirect('set_new_password')
                 else:
                     messages.error(request, 'Код истёк.')
             except PasswordResetCode.DoesNotExist:
@@ -160,22 +163,29 @@ def password_reset_verify_view(request):
 
 
 def set_new_password_view(request):
+    email = request.session.get('reset_email')
+
+    if not email:
+        messages.error(request, 'Сессия сброса пароля истекла. Начните сначала.')
+        return redirect('password_reset')
+
     if request.method == 'POST':
         form = SetNewPasswordForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email']
             password = form.cleaned_data['password1']
             try:
                 user = User.objects.get(email=email)
                 user.set_password(password)
                 user.save()
+
+                # Очистить email из сессии после сброса
+                del request.session['reset_email']
+
                 messages.success(request, 'Пароль успешно обновлён. Войдите с новым паролем.')
                 return redirect('login')
             except User.DoesNotExist:
                 messages.error(request, 'Пользователь не найден.')
     else:
-        # email должен быть передан как GET параметр
-        email = request.GET.get('email')
-        form = SetNewPasswordForm(initial={'email': email})
+        form = SetNewPasswordForm()
 
     return render(request, 'users/password_reset_set_password.html', {'form': form})

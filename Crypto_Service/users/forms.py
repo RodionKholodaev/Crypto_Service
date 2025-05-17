@@ -75,11 +75,9 @@ class PasswordResetRequestForm(forms.Form):
     )
 
 class PasswordResetVerifyForm(forms.Form):
-    email = forms.EmailField(label="Email")
     code = forms.CharField(label="Код", max_length=6)
 
 class SetNewPasswordForm(forms.Form):
-    email = forms.EmailField(widget=forms.HiddenInput())
     password1 = forms.CharField(
         label="Новый пароль",
         widget=forms.PasswordInput(attrs={
