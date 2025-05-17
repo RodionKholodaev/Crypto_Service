@@ -26,6 +26,8 @@ class RegisterForm(UserCreationForm):
             user.save()
         return user
 
+class EmailConfirmationForm(forms.Form):
+    code = forms.CharField(label="Код", max_length=6)
 
 # обновление данных в профиле
 class ProfileForm(forms.ModelForm):
@@ -73,6 +75,12 @@ class PasswordResetRequestForm(forms.Form):
             'id': 'email',
         })
     )
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if not User.objects.filter(email=email).exists():
+            raise forms.ValidationError("Почта не найдена")
+        return email
 
 class PasswordResetVerifyForm(forms.Form):
     code = forms.CharField(label="Код", max_length=6)

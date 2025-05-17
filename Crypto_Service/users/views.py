@@ -13,20 +13,85 @@ from django.core.mail import send_mail
 
 from .forms import SetNewPasswordForm
 from .models import User
+from .forms import EmailConfirmationForm
+from .models import EmailConfirmationCode
 
+
+# def register_view(request):
+#     if request.method == 'POST':
+#         form = RegisterForm(request.POST)
+#         if form.is_valid():
+#             user = form.save()
+#             login(request, user)
+#             return redirect('home')  # куда перейдет после регистрации
+#     else:
+#         form = RegisterForm()
+#     return render(request, 'users/register.html', {'form': form})
+
+# #видимо параметр {'form': form} ну нужен
 
 def register_view(request):
     if request.method == 'POST':
         form = RegisterForm(request.POST)
         if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect('home')  # куда перейдет после регистрации
+            request.session['reg_data'] = form.cleaned_data
+            code = generate_reset_code()
+
+            EmailConfirmationCode.objects.create(email=form.cleaned_data['email'], code=code)
+
+            send_mail(
+                'Подтверждение регистрации',
+                f'Ваш код подтверждения: {code}',
+                None,
+                [form.cleaned_data['email']],
+                fail_silently=False,
+            )
+
+            request.session['confirm_email'] = form.cleaned_data['email']
+            return redirect('confirm_email')
     else:
         form = RegisterForm()
     return render(request, 'users/register.html', {'form': form})
 
-#видимо параметр {'form': form} ну нужен
+def confirm_email_view(request):
+    email = request.session.get('confirm_email')
+    if not email:
+        return redirect('register')
+
+    if request.method == 'POST':
+        form = EmailConfirmationForm(request.POST)
+        if form.is_valid():
+            code = form.cleaned_data['code']
+            try:
+                entry = EmailConfirmationCode.objects.filter(email=email, code=code).latest('created_at')
+                if entry.is_valid():
+                    # Восстанавливаем данные формы из сессии
+                    data = request.session.get('reg_data')
+                    if data:
+                        reg_form = RegisterForm(data)
+                        if reg_form.is_valid():
+                            user = reg_form.save()  # ← Сохраняем через форму, как в обычной регистрации
+                            login(request, user)
+
+                            # Очистка
+                            EmailConfirmationCode.objects.filter(email=email).delete()
+                            del request.session['confirm_email']
+                            del request.session['reg_data']
+
+                            return redirect('home')
+                        else:
+                            messages.error(request, 'Ошибка при создании пользователя. Попробуйте снова.')
+                    else:
+                        messages.error(request, 'Сессия истекла. Пожалуйста, зарегистрируйтесь заново.')
+                        return redirect('register')
+
+            except EmailConfirmationCode.DoesNotExist:
+                messages.error(request, 'Неверный код.')
+    else:
+        form = EmailConfirmationForm()
+
+    return render(request, 'users/password_reset_verify.html', {'form': form})
+
 
 def login_view(request):
     if request.method == 'POST':
