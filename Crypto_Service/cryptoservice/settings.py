@@ -32,11 +32,7 @@ ALLOWED_HOSTS = ['localhost','127.0.0.1','web']
 INSTALLED_APPS = [
     'analytics',
     'bots',
-    'exchanges',
     'main',
-    'notification',
-    'sendbox',
-    'strategies',
     'users',
     'encrypted_model_fields', # для шифрования
     'django.contrib.admin', # создает автоматический интерфейс для управленя данными
