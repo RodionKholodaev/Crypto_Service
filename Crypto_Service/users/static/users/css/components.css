@@ -52,3 +52,17 @@
     border-color: var(--primary);
     box-shadow: 0 0 0 2px var(--primary-focus, rgba(108, 92, 231, 0.2));
 }
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+    position: relative;
+}
+
+.form-label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: 500;
+    color: var(--text-color);
+}
+

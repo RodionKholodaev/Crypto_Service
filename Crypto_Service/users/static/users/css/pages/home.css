@@ -190,3 +190,22 @@
     padding: 5px 10px;
     font-size: 14px;
 }
+
+.password-input-container {
+    position: relative;
+}
+
+.password-input-container .form-control {
+    padding-right: 40px; /* Оставляем место для иконки */
+}
+
+.password-toggle-icon {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    cursor: pointer;
+    color: var(--muted-color);
+    font-size: 18px;
+    z-index: 2;
+}
