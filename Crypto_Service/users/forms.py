@@ -20,11 +20,12 @@ class RegisterForm(UserCreationForm):
         return email
 
     def save(self, commit=True):
-        user = super().save(commit=False)
+        user = super().save(commit=False) # save - функция из UserCreationForm, commit=False - пока объект не сохраняется в бд
+        # 
         user.name = self.cleaned_data['name']  # Сохраняем имя
-        if commit:
-            user.save()
-        return user
+        if commit: # проверяем нужно ли сохранять данные в бд
+            user.save() # сохранение в бд
+        return user # возвращаем объект польхователя чтобы далее использовать его, например на другой странице
 
 class EmailConfirmationForm(forms.Form):
     code = forms.CharField(label="Код", max_length=6)

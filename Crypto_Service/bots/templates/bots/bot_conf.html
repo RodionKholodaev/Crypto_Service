@@ -62,16 +62,7 @@
                                 <option value="CUSTOM">Другая</option>
                             </select>
                         </div>
-                        <span class="pair-divider">/</span>
-                        <div class="dropdown" style="flex: 1;">
-                            <select name="quote_currency" class="form-control" id="quoteCurrencySelect">
-                                <option value="USDT">USDT</option>
-                                <option value="BUSD">BUSD</option>
-                                <option value="BTC">BTC</option>
-                                <option value="ETH">ETH</option>
-                                <option value="CUSTOM">Другая</option>
-                            </select>
-                        </div>
+                        <span class="pair-divider">/USDT</span>
                     </div>
                     <div id="customCurrencyInput" style="display: none; margin-top: 10px;">
                         <input type="text" class="form-control" name="custom_currency" placeholder="Введите код валюты (например: ADA)">
@@ -291,13 +282,6 @@
             }
         });
         
-        document.getElementById('quoteCurrencySelect').addEventListener('change', function() {
-            if (this.value === 'CUSTOM') {
-                document.getElementById('customCurrencyInput').style.display = 'block';
-            } else {
-                document.getElementById('customCurrencyInput').style.display = 'none';
-            }
-        });
         
         // Add new indicator form
         function addIndicator() {

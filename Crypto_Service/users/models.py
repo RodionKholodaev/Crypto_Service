@@ -25,7 +25,7 @@ class User(AbstractUser):
     REQUIRED_FIELDS = []
 
     def __str__(self):
-        return self.email
+        return self.email # если вывести {{user}}, то выйдет не <User: User object (1)>, а нормальный email
 
 class PasswordResetCode(models.Model):
     email = models.EmailField()

@@ -19,7 +19,7 @@ def create_bot(request):
             if formset.is_valid():
                 formset.save()
             
-            return redirect('bot_detail', bot_id=bot.id)
+            return redirect('home')
     else:
         form = BotForm(user=request.user)
         formset = IndicatorFormSet(instance=None)

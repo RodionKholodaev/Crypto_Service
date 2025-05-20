@@ -20,8 +20,9 @@ from .models import EmailConfirmationCode
 def register_view(request):
     if request.method == 'POST': # отправляется когда пользователь отправляет форму
         form = RegisterForm(request.POST)
-        if form.is_valid():
-            request.session['reg_data'] = form.cleaned_data # cleaned_data словарь {'email': 'user@example.com','name': 'Иван','password1': 'securepassword123','password2': 'securepassword123'}
+        if form.is_valid(): # метод UserCreationForm
+            request.session['reg_data'] = form.cleaned_data
+            # cleaned_data словарь {'email': 'user@example.com','name': 'Иван','password1': 'securepassword123','password2': 'securepassword123'}
             # cleaned_data - общий механизм django форм
             # также у каждой формы есть поля form.errors, form.fields, form.initial
             code = generate_reset_code()

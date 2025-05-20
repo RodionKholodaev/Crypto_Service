@@ -3,6 +3,7 @@ from django.forms import inlineformset_factory
 from .models import Bot, Indicator, ExchangeAccount
 
 class IndicatorForm(forms.ModelForm):
+    # списки для ChoiceField
     INDICATOR_CHOICES = [
         ('RSI', 'Relative Strength Index'),
         ('MACD', 'Moving Average Convergence Divergence'),
@@ -33,27 +34,36 @@ class IndicatorForm(forms.ModelForm):
     condition = forms.ChoiceField(choices=CONDITION_CHOICES, label="Условие")
     value = forms.FloatField(label="Значение")
     
+    # связь с бд и указание полей
     class Meta:
         model = Indicator
         fields = ['indicator_type', 'timeframe']
+        # указываем какие поля модели не нужно включать в форму
         exclude = ['parameters']
     
+    # метод для сохранения данных в бд
     def save(self, commit=True):
+        # через super() обращаемся к родительскому классу у indicator (models.Model) и у него вызываем метод save()
+        # сначала не сохраняем данные, что бы добавить поле parameters (пока не понял почему)
         indicator = super().save(commit=False)
+        # заполняем поле parameters
         indicator.parameters = {
             'condition': self.cleaned_data['condition'],
             'value': self.cleaned_data['value']
         }
+        # сохраняем данные в бд, так как commit=True
         if commit:
             indicator.save()
         return indicator
 
-IndicatorFormSet = inlineformset_factory(
+IndicatorFormSet = inlineformset_factory(  # обработка формы, которая появляется по кнопке (inline формы)
     Bot, Indicator, 
     form=IndicatorForm,
     extra=1,
     can_delete=True
 )
+
+
 
 class BotForm(forms.ModelForm):
     BASE_CURRENCY_CHOICES = [
@@ -65,16 +75,7 @@ class BotForm(forms.ModelForm):
         ('CUSTOM', 'Другая'),
     ]
     
-    QUOTE_CURRENCY_CHOICES = [
-        ('USDT', 'USDT'),
-        ('BUSD', 'BUSD'),
-        ('BTC', 'BTC'),
-        ('ETH', 'ETH'),
-        ('CUSTOM', 'Другая'),
-    ]
-    
     base_currency = forms.ChoiceField(choices=BASE_CURRENCY_CHOICES, label="Базовая валюта")
-    quote_currency = forms.ChoiceField(choices=QUOTE_CURRENCY_CHOICES, label="Котируемая валюта")
     custom_currency = forms.CharField(required=False, label="Пользовательская валюта")
     
     class Meta:
@@ -90,33 +91,21 @@ class BotForm(forms.ModelForm):
         self.fields['exchange_account'].queryset = ExchangeAccount.objects.filter(user=user, is_active=True)
         
         if self.instance.pk:
-            # If editing existing bot, set initial values for currency fields
             trading_pair = self.instance.trading_pair
             if trading_pair:
-                # Simple parsing - assumes 3-4 character currencies
-                base = trading_pair[:3] if len(trading_pair) == 6 else trading_pair[:4]
-                quote = trading_pair[3:] if len(trading_pair) == 6 else trading_pair[4:]
+                # Удаляем 'USDT' из конца строки
+                base = trading_pair[:-4]  # предполагаем формат XXXXXUSDT
                 
-                # Check if base is in our choices
                 base_choices = dict(self.BASE_CURRENCY_CHOICES)
                 if base not in base_choices:
                     self.fields['base_currency'].initial = 'CUSTOM'
                     self.fields['custom_currency'].initial = base
                 else:
                     self.fields['base_currency'].initial = base
-                
-                # Check if quote is in our choices
-                quote_choices = dict(self.QUOTE_CURRENCY_CHOICES)
-                if quote not in quote_choices:
-                    self.fields['quote_currency'].initial = 'CUSTOM'
-                    self.fields['custom_currency'].initial = quote
-                else:
-                    self.fields['quote_currency'].initial = quote
     
     def clean(self):
         cleaned_data = super().clean()
         base_currency = cleaned_data.get('base_currency')
-        quote_currency = cleaned_data.get('quote_currency')
         custom_currency = cleaned_data.get('custom_currency')
         
         # Handle custom currency
@@ -124,24 +113,12 @@ class BotForm(forms.ModelForm):
             if not custom_currency:
                 self.add_error('custom_currency', 'Пожалуйста, введите код валюты')
             else:
-                cleaned_data['base_currency'] = custom_currency.strip().upper()
+                cleaned_currency = custom_currency.strip().upper()
+                if cleaned_currency == 'USDT':
+                    self.add_error('custom_currency', 'Базовая валюта не может быть USDT')
+                cleaned_data['base_currency'] = cleaned_currency
         
-        if quote_currency == 'CUSTOM':
-            if not custom_currency:
-                self.add_error('custom_currency', 'Пожалуйста, введите код валюты')
-            else:
-                cleaned_data['quote_currency'] = custom_currency.strip().upper()
-        
-        # Create trading pair
-        cleaned_data['trading_pair'] = f"{cleaned_data.get('base_currency')}{cleaned_data.get('quote_currency')}"
+        # котируемая валюта USDT
+        cleaned_data['trading_pair'] = f"{cleaned_data.get('base_currency')}USDT"
         
         return cleaned_data
-    
-    def save(self, commit=True):
-        bot = super().save(commit=False)
-        bot.trading_pair = self.cleaned_data['trading_pair']
-        
-        if commit:
-            bot.save()
-        
-        return bot

@@ -19,7 +19,7 @@ class ExchangeAccount(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     def __str__(self):
-        return f"{self.name} ({self.exchange})"
+        return f"{self.name} ({self.exchange})" # вывод: название аккаута (биржа), если выполним {ExchangeAccount} где-то в шаблоне
 
 
 
