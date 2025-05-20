@@ -44,9 +44,11 @@ class IndicatorForm(forms.ModelForm):
     # метод для сохранения данных в бд
     def save(self, commit=True):
         # через super() обращаемся к родительскому классу у indicator (models.Model) и у него вызываем метод save()
-        # сначала не сохраняем данные, что бы добавить поле parameters (пока не понял почему)
+        # сначала не сохраняем данные, что бы добавить поле parameters (это нужно потому что parameters собирает значение из двух полей)
         indicator = super().save(commit=False)
         # заполняем поле parameters
+        # собираем parameters и только потом сохраняем это в бд
+        # это частая практика
         indicator.parameters = {
             'condition': self.cleaned_data['condition'],
             'value': self.cleaned_data['value']
@@ -75,9 +77,13 @@ class BotForm(forms.ModelForm):
         ('CUSTOM', 'Другая'),
     ]
     
+    # виртуальные поля формы которых нет в модели
+    # из этих полей мы собираем 
     base_currency = forms.ChoiceField(choices=BASE_CURRENCY_CHOICES, label="Базовая валюта")
     custom_currency = forms.CharField(required=False, label="Пользовательская валюта")
     
+    # связь с таблицей и указание полей
+    # В meta указываем только поля модели
     class Meta:
         model = Bot
         fields = [
@@ -85,18 +91,69 @@ class BotForm(forms.ModelForm):
             'bot_leverage', 'take_profit_percent', 'stop_loss_percent',
             'grid_orders_count', 'grid_overlap_percent'
         ]
-    
+    # *args - специлальный синтаксис python, который позволяет функции принимать произвольное количество позиционных аргументов
+    # пример
+    # def my_function(*args):
+    # for arg in args:
+    #     print(arg)
+
+    # my_function(1, 2, 3)
+
+    # кастомный __init__ обязательно принимает user
+    # после этого *args, **kwargs передается в __init__ родительского класса
+    # *args - кортеж из одного элемента: (request.POST,)
+    # **kwargs - пустой словарь
+
+    # то есть вызов: super().__init__(*args, **kwargs) <=> super().__init__(request.POST)
+
+    # **kwargs — это ещё один специальный синтаксис в Python,
+    #  который позволяет функции или методу принимать произвольное количество именованных аргументов
+    #пример:
+    # def my_function(**kwargs):
+        # for key, value in kwargs.items():
+        #     print(f"{key} = {value}")
+
+    # my_function(name="Alice", age=30, city="Moscow") 
+    # вывод:
+    # name = Alice
+    # age = 30
+    # city = Moscow
     def __init__(self, user, *args, **kwargs):
+        # запуск __init__ родительской формы
         super().__init__(*args, **kwargs)
+        # выбирает api ключи пользователя и is_active=True
+
+        # QuerySet — это специальный объект в Django. Он обращается к бд но не сразу
+        # каждое поле что связано с моделью имее атрибут queryset
+        #  в этом поле мы меняем queryset для exchange_account чтобы там были только активные аккаунты пользователя
+        # ExchangeAccount.objects.filter(...) возвращает стуктуру QuerySet
+        # ExchangeAccount.objects.filter(...) - замена кода sql
+        # из этого набора будет формироваться списко в выподающей html форме
         self.fields['exchange_account'].queryset = ExchangeAccount.objects.filter(user=user, is_active=True)
         
+        # проверка, редактируем ли мы бот или создаем
+        # instance - экземпляр модели с которой работает modelform
+        # если форма создается для редактирования существубщего обекта, то в instance будут его поля
+        # если объект пока не существует, то в self.instance будет None
+        # что есть в instance:
+        # pk, save(), delete(), id, все поля модели
+        # initial - начальные значения для полей формы
+        # в коде это используется для передачи с имеющихся данных при редактировании
+        # pk - уникальный индентификатор записи в таблице
+        # если pk существует -> объект сохранен в бд
+        # если pk=None -> обект пока не существует
+
         if self.instance.pk:
             trading_pair = self.instance.trading_pair
+            # есть ли у бота trading_pair
             if trading_pair:
                 # Удаляем 'USDT' из конца строки
                 base = trading_pair[:-4]  # предполагаем формат XXXXXUSDT
                 
+                # преобразуем список из кортежей с словарь
                 base_choices = dict(self.BASE_CURRENCY_CHOICES)
+                
+                # проверяем есть ли валюта в BASE_CURRENCY_CHOICES
                 if base not in base_choices:
                     self.fields['base_currency'].initial = 'CUSTOM'
                     self.fields['custom_currency'].initial = base
@@ -104,21 +161,35 @@ class BotForm(forms.ModelForm):
                     self.fields['base_currency'].initial = base
     
     def clean(self):
+        # super().clean() проверяет валидность всех полей, возвращает словарь с приведенными к правильному типу значениями
         cleaned_data = super().clean()
         base_currency = cleaned_data.get('base_currency')
         custom_currency = cleaned_data.get('custom_currency')
         
-        # Handle custom currency
+        # работа с введенной валютой
+        # проверяет введена ли CUSTOM валюта
         if base_currency == 'CUSTOM':
+            # проверяет не пустое ли поле
             if not custom_currency:
+                # вывод ошибки
+                # словарь ошибок в forms.ModelForm
                 self.add_error('custom_currency', 'Пожалуйста, введите код валюты')
             else:
+                # .strip() удаляет пробелы .upper() приводит к верхнему регистру 
                 cleaned_currency = custom_currency.strip().upper()
+                # проверка на base=USDT
                 if cleaned_currency == 'USDT':
                     self.add_error('custom_currency', 'Базовая валюта не может быть USDT')
                 cleaned_data['base_currency'] = cleaned_currency
         
         # котируемая валюта USDT
+        # записываем trading_pair в cleaned_data
         cleaned_data['trading_pair'] = f"{cleaned_data.get('base_currency')}USDT"
         
         return cleaned_data
+    
+
+# .save() — сохранение данных
+# пример:
+# obj = form.save()  # Сохраняет в БД
+# obj = form.save(commit=False)  # Возвращает объект, но не сохраняет

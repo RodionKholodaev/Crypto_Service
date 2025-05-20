@@ -6,11 +6,13 @@ from .models import Bot, ExchangeAccount
 @login_required
 def create_bot(request):
     if request.method == 'POST':
+        # создание экземпляра формы с данными из post запроса
         form = BotForm(request.user, request.POST)
         formset = IndicatorFormSet(request.POST, instance=None)
         
         if form.is_valid():
             bot = form.save(commit=False)
+            # установка связи между ботом и пользователем
             bot.user = request.user
             bot.save()
             
