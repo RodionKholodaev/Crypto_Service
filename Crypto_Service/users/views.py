@@ -233,6 +233,9 @@ def set_new_password_view(request):
                 user.set_password(password)
                 user.save()
 
+                # Удаляем все коды сброса пароля для этого email
+                PasswordResetCode.objects.filter(email=email).delete()
+
                 # Очистить email из сессии после сброса
                 del request.session['reset_email']
 
