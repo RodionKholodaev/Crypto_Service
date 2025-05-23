@@ -82,8 +82,6 @@ class BotForm(forms.ModelForm):
     base_currency = forms.ChoiceField(choices=BASE_CURRENCY_CHOICES, label="Базовая валюта")
     custom_currency = forms.CharField(required=False, label="Пользовательская валюта")
     
-    # связь с таблицей и указание полей
-    # В meta указываем только поля модели
     class Meta:
         model = Bot
         fields = [
@@ -91,33 +89,7 @@ class BotForm(forms.ModelForm):
             'bot_leverage', 'take_profit_percent', 'stop_loss_percent',
             'grid_orders_count', 'grid_overlap_percent'
         ]
-    # *args - специлальный синтаксис python, который позволяет функции принимать произвольное количество позиционных аргументов
-    # пример
-    # def my_function(*args):
-    # for arg in args:
-    #     print(arg)
-
-    # my_function(1, 2, 3)
-
-    # кастомный __init__ обязательно принимает user
-    # после этого *args, **kwargs передается в __init__ родительского класса
-    # *args - кортеж из одного элемента: (request.POST,)
-    # **kwargs - пустой словарь
-
-    # то есть вызов: super().__init__(*args, **kwargs) <=> super().__init__(request.POST)
-
-    # **kwargs — это ещё один специальный синтаксис в Python,
-    #  который позволяет функции или методу принимать произвольное количество именованных аргументов
-    #пример:
-    # def my_function(**kwargs):
-        # for key, value in kwargs.items():
-        #     print(f"{key} = {value}")
-
-    # my_function(name="Alice", age=30, city="Moscow") 
-    # вывод:
-    # name = Alice
-    # age = 30
-    # city = Moscow
+   
     def __init__(self, user, *args, **kwargs):
         # запуск __init__ родительской формы
         super().__init__(*args, **kwargs)
@@ -160,6 +132,15 @@ class BotForm(forms.ModelForm):
                 else:
                     self.fields['base_currency'].initial = base
     
+    def save(self, commit=True):
+        bot = super().save(commit=False)
+        # Устанавливаем trading_pair из cleaned_data
+        bot.trading_pair = self.cleaned_data.get('trading_pair')
+        if commit:
+            bot.save()
+        return bot
+
+
     def clean(self):
         # super().clean() проверяет валидность всех полей, возвращает словарь с приведенными к правильному типу значениями
         cleaned_data = super().clean()

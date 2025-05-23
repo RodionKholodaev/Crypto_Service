@@ -24,6 +24,8 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),
+    path('user/', include('users.urls')),  # Основные маршруты (регистрация, вход, home)
+    path('bots/', include('bots.urls')),  # Все маршруты ботов будут начинаться с /bots/
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) # позволяет раздавать медиа файлы во время разработки
 # в продакшене нужно будет настраивать nginx

@@ -1,0 +1,212 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Мои боты | CryptoBotHub</title>
+    <link rel="stylesheet" href="{% static 'bots/css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        {% csrf_token %} 
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-robot"></i> Мои боты</h1>
+            <div class="header-actions">
+                <div class="sort-dropdown">
+                    <select id="sortSelect" onchange="sortBots(this.value)">
+                        <option value="name_asc">По имени (А-Я)</option>
+                        <option value="name_desc">По имени (Я-А)</option>
+                        <option value="active">Активные сначала</option>
+                        <option value="inactive">Неактивные сначала</option>
+                        <option value="profit">По прибыли</option>
+                    </select>
+                </div>
+                <a href="{% url 'create_bot' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Создать бота</a>
+            </div>
+        </div>
+
+        {% if bots %}
+            <div class="bots-grid">
+                {% for bot in bots %}
+                <div class="bot-card {% if bot.is_active %}active{% else %}inactive{% endif %}">
+                    <div class="bot-card-header">
+                        <div class="bot-name-wrapper">
+                            <h3>{{ bot.name }}</h3>
+                            <span class="bot-status {% if bot.is_active %}active{% else %}inactive{% endif %}">
+                                {% if bot.is_active %}
+                                    <i class="fas fa-circle-running"></i> Активен
+                                {% else %}
+                                    <i class="fas fa-circle-pause"></i> Остановлен
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="bot-strategy {% if bot.strategy %}long{% else %}short{% endif %}">
+                            {% if bot.strategy %}
+                                <i class="fas fa-arrow-trend-up"></i> Long
+                            {% else %}
+                                <i class="fas fa-arrow-trend-down"></i> Short
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <div class="bot-details">
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fas fa-coins"></i> Пара:</span>
+                            <span class="detail-value">{{ bot.trading_pair }}</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fas fa-wallet"></i> Депозит:</span>
+                            <span class="detail-value">{{ bot.deposit }} USDT</span>
+                        </div>
+                        <div class="detail-row">
+                            <span class="detail-label"><i class="fas fa-arrows-up-down-left-right"></i> Плечо:</span>
+                            <span class="detail-value">{{ bot.bot_leverage }}x</span>
+                        </div>
+                        
+                        <!-- Статистика сделок -->
+                        <div class="deal-stats">
+                            <div class="stat-item">
+                                <span class="stat-label">Сделок:</span>
+                                <span class="stat-value">{{ bot.deals.count }}</span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">Прибыль:</span>
+                                <span class="stat-value {% if bot.total_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                                    {{ bot.total_pnl|floatformat:2 }} USDT
+                                </span>
+                            </div>
+                            <div class="stat-item">
+                                <span class="stat-label">ROI:</span>
+                                <span class="stat-value {% if bot.roi >= 0 %}positive{% else %}negative{% endif %}">
+                                    {{ bot.roi|floatformat:2 }}%
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="bot-actions">
+                        <a href="{% url 'edit_bot' bot.id %}" class="btn-action edit" title="Редактировать">
+                            <i class="fas fa-cog"></i>
+                        </a>
+                        <button class="btn-action delete" onclick="confirmDelete({{ bot.id }})" title="Удалить">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                        {% if bot.is_active %}
+                            <button class="btn-action stop" title="Остановить" onclick="toggleBot({{ bot.id }}, false)">
+                                <i class="fas fa-power-off"></i>
+                            </button>
+                        {% else %}
+                            <button class="btn-action start" title="Запустить" onclick="toggleBot({{ bot.id }}, true)">
+                                <i class="fas fa-play"></i>
+                            </button>
+                        {% endif %}
+                        <a href="{% url 'bot_details' bot.id %}" class="btn-action info" title="Подробнее">
+                            <i class="fas fa-chart-line"></i>
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            
+            <!-- Пагинация -->
+            <div class="pagination">
+                {% if bots.has_previous %}
+                    <a href="?page=1" class="page-link first"><i class="fas fa-angle-double-left"></i></a>
+                    <a href="?page={{ bots.previous_page_number }}" class="page-link prev"><i class="fas fa-angle-left"></i></a>
+                {% endif %}
+                
+                <span class="current-page">{{ bots.number }} / {{ bots.paginator.num_pages }}</span>
+                
+                {% if bots.has_next %}
+                    <a href="?page={{ bots.next_page_number }}" class="page-link next"><i class="fas fa-angle-right"></i></a>
+                    <a href="?page={{ bots.paginator.num_pages }}" class="page-link last"><i class="fas fa-angle-double-right"></i></a>
+                {% endif %}
+            </div>
+        {% else %}
+            <div class="empty-state">
+                <div class="empty-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <h3>Ботов пока нет</h3>
+                <p>Создайте своего первого торгового бота, чтобы начать автоматическую торговлю</p>
+                <a href="{% url 'create_bot' %}" class="btn btn-primary"><i class="fas fa-plus"></i> Создать бота</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Подтверждение удаления и другие скрипты -->
+    <script>
+
+
+        // В шаблоне my_bots.html обновите функцию confirmDelete
+        function confirmDelete(botId) {
+            if (confirm("Вы уверены, что хотите удалить этого бота?")) {
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                if (!csrfToken) {
+                    alert("Ошибка безопасности: CSRF-токен не найден.");
+                    return;
+                }
+
+                fetch(`/bots/bots/${botId}/delete/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'same-origin'
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Ошибка сервера');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при удалении бота');
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка: ' + error.message);
+                });
+            }
+        }
+        
+        function toggleBot(botId, activate) {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+            if (!csrfToken) {
+                alert("Ошибка безопасности: CSRF-токен не найден.");
+                return;
+            }
+
+            fetch(`/bots/${botId}/toggle/`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrfToken,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({activate: activate})
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Ошибка сервера');
+                return response.json();
+            })
+            .then(data => {
+                if (data.status === 'success') {
+                    location.reload();
+                } else {
+                    alert(data.message || 'Ошибка изменения статуса');
+                }
+            })
+            .catch(error => {
+                alert('Ошибка: ' + error.message);
+            });
+        }
+        
+        function sortBots(sortBy) {
+            window.location.href = `?sort=${sortBy}`;
+        }
+    </script>
+</body>
+</html>

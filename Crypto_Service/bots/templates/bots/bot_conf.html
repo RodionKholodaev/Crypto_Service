@@ -74,7 +74,7 @@
                     <input type="number" class="form-control" name="deposit" placeholder="1000" min="0" step="0.01" required value="{{ form.deposit.value|default_if_none:'' }}">
                 </div>
                 
-                <div class="form-group">
+                <div class="form-group"> leverageSlider
                     <label class="form-label">Плечо <span id="leverageValue">10x</span></label>
                     <input type="range" min="1" max="50" value="{{ form.bot_leverage.value|default_if_none:'10' }}" class="leverage-slider" id="leverageSlider" name="bot_leverage">
                     <div class="leverage-values">
@@ -144,6 +144,10 @@
             <div class="form-section">
                 <h2 class="section-title"><i class="fas fa-chart-line"></i> Индикаторы для входа</h2>
                 
+
+                <div style="display:none;">
+                    {{ formset.management_form }}
+                </div>
                 <div id="indicatorsContainer">
                     {% for indicator in form.indicators %}
                     <div class="indicator-form">
@@ -225,16 +229,86 @@
     <script>
         // Initialize leverage value display
         document.addEventListener('DOMContentLoaded', function() {
-            const leverageSlider = document.getElementById('leverageSlider');
-            document.getElementById('leverageValue').textContent = leverageSlider.value + 'x';
+            // Инициализация других элементов...
             
-            // Check if custom currency is needed
-            const baseCurrency = document.getElementById('baseCurrencySelect');
-            const quoteCurrency = document.getElementById('quoteCurrencySelect');
-            
-            if (baseCurrency.value === 'CUSTOM' || quoteCurrency.value === 'CUSTOM') {
-                document.getElementById('customCurrencyInput').style.display = 'block';
-            }
+            // Функция для обновления счетчика форм
+            window.updateFormCount = function() {
+                const totalForms = document.getElementById('id_indicators-TOTAL_FORMS');
+                if (totalForms) {
+                    const formCount = document.querySelectorAll('#indicatorsContainer .indicator-form').length;
+                    totalForms.value = formCount;
+                }
+            };
+
+            // Добавление нового индикатора
+            window.addIndicator = function() {
+                const container = document.getElementById('indicatorsContainer');
+                const totalForms = document.getElementById('id_indicators-TOTAL_FORMS');
+                const formCount = totalForms ? parseInt(totalForms.value) : 0;
+                
+                const newForm = document.createElement('div');
+                newForm.className = 'indicator-form';
+                newForm.innerHTML = `
+                    <div class="indicator-row">
+                        <div class="form-group">
+                            <label class="form-label">Индикатор</label>
+                            <select name="indicators-${formCount}-indicator_type" class="form-control">
+                                <option value="RSI">RSI</option>
+                                <option value="MACD">MACD</option>
+                                <option value="MA">Moving Average</option>
+                                <option value="BOLL">Bollinger Bands</option>
+                                <option value="STOCH">Stochastic</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Таймфрейм</label>
+                            <select name="indicators-${formCount}-timeframe" class="form-control">
+                                <option value="1m">1 минута</option>
+                                <option value="5m">5 минут</option>
+                                <option value="15m">15 минут</option>
+                                <option value="30m">30 минут</option>
+                                <option value="1h">1 час</option>
+                                <option value="4h">4 часа</option>
+                                <option value="1d">1 день</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="indicator-row">
+                        <div class="form-group">
+                            <label class="form-label">Условие</label>
+                            <select name="indicators-${formCount}-condition" class="form-control">
+                                <option value="lt"><</option>
+                                <option value="lte"><=</option>
+                                <option value="gt">></option>
+                                <option value="gte">>=</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Значение</label>
+                            <input type="number" name="indicators-${formCount}-value" class="form-control" placeholder="30" step="0.1">
+                        </div>
+                    </div>
+                    
+                    <button type="button" class="btn btn-outline" onclick="removeIndicator(this)" style="margin-top: 10px;">
+                        <i class="fas fa-trash"></i> Удалить индикатор
+                    </button>
+                `;
+                window.removeIndicator = function(button) {
+                    button.parentNode.remove();
+                    updateFormCount();
+                };
+                
+                container.appendChild(newForm);
+                if (totalForms) {
+                    totalForms.value = formCount + 1;
+                }
+            };
+
+            // Инициализация при загрузке
+            updateFormCount();
         });
         
         // Leverage slider
@@ -286,13 +360,16 @@
         // Add new indicator form
         function addIndicator() {
             const container = document.getElementById('indicatorsContainer');
+            const totalForms = document.getElementById('id_indicators-TOTAL_FORMS');
+            const formIdx = totalForms.value;
+            
             const newIndicator = document.createElement('div');
             newIndicator.className = 'indicator-form';
             newIndicator.innerHTML = `
                 <div class="indicator-row">
                     <div class="form-group">
                         <label class="form-label">Индикатор</label>
-                        <select name="indicators-__prefix__-indicator_type" class="form-control">
+                        <select name="indicators-${formIdx}-indicator_type" class="form-control">
                             <option value="RSI">RSI</option>
                             <option value="MACD">MACD</option>
                             <option value="MA">Moving Average</option>
@@ -303,7 +380,7 @@
                     
                     <div class="form-group">
                         <label class="form-label">Таймфрейм</label>
-                        <select name="indicators-__prefix__-timeframe" class="form-control">
+                        <select name="indicators-${formIdx}-timeframe" class="form-control">
                             <option value="1m">1 минута</option>
                             <option value="5m">5 минут</option>
                             <option value="15m">15 минут</option>
@@ -318,7 +395,7 @@
                 <div class="indicator-row">
                     <div class="form-group">
                         <label class="form-label">Условие</label>
-                        <select name="indicators-__prefix__-condition" class="form-control">
+                        <select name="indicators-${formIdx}-condition" class="form-control">
                             <option value="lt"><</option>
                             <option value="lte"><=</option>
                             <option value="gt">></option>
@@ -328,7 +405,7 @@
                     
                     <div class="form-group">
                         <label class="form-label">Значение</label>
-                        <input type="number" name="indicators-__prefix__-value" class="form-control" placeholder="30" step="0.1">
+                        <input type="number" name="indicators-${formIdx}-value" class="form-control" placeholder="30" step="0.1">
                     </div>
                 </div>
                 
@@ -337,11 +414,7 @@
                 </button>
             `;
             container.appendChild(newIndicator);
-            
-            // Update the form prefix for Django formsets
-            const totalForms = document.getElementById('id_indicators-TOTAL_FORMS');
-            totalForms.value = parseInt(totalForms.value) + 1;
-            newIndicator.innerHTML = newIndicator.innerHTML.replace(/__prefix__/g, totalForms.value - 1);
+            totalForms.value = parseInt(formIdx) + 1;
         }
         
         // Toggle Stop Loss field visibility

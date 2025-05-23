@@ -48,3 +48,5 @@ class EmailConfirmationCode(models.Model):
 
     def __str__(self):
         return f"{self.email} - {self.code}"
+    
+
