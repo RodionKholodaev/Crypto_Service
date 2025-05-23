@@ -45,7 +45,7 @@ class Bot(models.Model):
     # Основные настройки
     trading_pair = models.CharField(max_length=20)
     take_profit_percent = models.PositiveIntegerField()
-    stop_loss_percent = models.PositiveIntegerField()
+    stop_loss_percent = models.PositiveIntegerField(blank=True, null=True,default=None)
     
     # Настройки сетки ордеров
     grid_orders_count = models.PositiveIntegerField()
