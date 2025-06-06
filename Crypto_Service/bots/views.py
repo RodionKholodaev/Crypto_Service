@@ -7,6 +7,9 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.db.models import Sum, F
 import json
+from .tasks import run_trading_bot
+from .statistics import generate_pnl_chart
+from celery import current_app
 
 @login_required
 def create_bot(request):
@@ -20,20 +23,20 @@ def create_bot(request):
             bot.save()
             formset.instance = bot
             formset.save()
+            
+            if bot.is_active:
+                run_trading_bot.apply_async(args=[bot.id], task_id=f"run_trading_bot_{bot.id}")
+            
             return redirect('home')
     else:
         form = BotForm(user=request.user)
-        formset = IndicatorFormSet(queryset=Indicator.objects.none())  # Пустой queryset для новой формы
+        formset = IndicatorFormSet(queryset=Indicator.objects.none())
     
     return render(request, 'bots/bot_conf.html', {
         'form': form,
-        'formset': formset,  # Убедитесь, что это передаётся
+        'formset': formset,
         'exchange_accounts': ExchangeAccount.objects.filter(user=request.user, is_active=True)
     })
-
-
-
-
 
 @login_required
 def edit_bot(request, bot_id):
@@ -46,7 +49,11 @@ def edit_bot(request, bot_id):
         if form.is_valid() and formset.is_valid():
             form.save()
             formset.save()
-            return redirect('my_bots')  # Или другой подходящий URL
+            
+            if bot.is_active:
+                run_trading_bot.apply_async(args=[bot.id], task_id=f"run_trading_bot_{bot.id}")
+            
+            return redirect('my_bots')
     else:
         form = BotForm(request.user, instance=bot)
         formset = IndicatorFormSet(instance=bot)
@@ -57,14 +64,8 @@ def edit_bot(request, bot_id):
         'formset': formset,
         'exchange_accounts': exchange_accounts,
         'editing': True,
-        'bot_id': bot_id  # Передаём ID бота в шаблон
+        'bot_id': bot_id
     })
-
-
-
-
-
-
 
 @login_required
 def my_bots(request):
@@ -73,7 +74,6 @@ def my_bots(request):
         roi=(Sum('deals__pnl') / F('deposit')) * 100
     )
     
-    # Сортировка
     sort_by = request.GET.get('sort', 'name_asc')
     if sort_by == 'name_desc':
         bots = bots.order_by('-name')
@@ -83,23 +83,22 @@ def my_bots(request):
         bots = bots.order_by('is_active', 'name')
     elif sort_by == 'profit':
         bots = bots.order_by('-total_pnl')
-    else:  # name_asc по умолчанию
+    else:
         bots = bots.order_by('name')
     
-    # Пагинация
-    paginator = Paginator(bots, 9)  # 9 ботов на страницу
+    paginator = Paginator(bots, 9)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
     
     return render(request, 'bots/my_bots.html', {'bots': page_obj})
-
-
 
 @require_POST
 @login_required
 def delete_bot(request, bot_id):
     try:
         bot = Bot.objects.get(id=bot_id, user=request.user)
+        # Отменяем задачу Celery, если она существует
+        current_app.control.revoke(f"run_trading_bot_{bot_id}", terminate=True)
         bot.delete()
         return JsonResponse({'status': 'success', 'message': 'Бот успешно удален'})
     except Bot.DoesNotExist:
@@ -113,17 +112,22 @@ def delete_bot(request, bot_id):
             status=500
         )
 
-
-
-
 @require_POST
+@login_required
 def toggle_bot(request, bot_id):
     bot = get_object_or_404(Bot, id=bot_id, user=request.user)
-    activate = json.loads(request.body).get('activate', False)
+    data = json.loads(request.body)
+    activate = data.get('activate', False)
     bot.is_active = activate
     bot.save()
+    
+    if activate:
+        run_trading_bot.apply_async(args=[bot.id], task_id=f"run_trading_bot_{bot.id}")
+    else:
+        # Отменяем задачу Celery при деактивации
+        current_app.control.revoke(f"run_trading_bot_{bot_id}", terminate=True)
+    
     return JsonResponse({'status': 'success'})
-
 
 def bot_details(request, bot_id):
     bot = get_object_or_404(Bot, id=bot_id, user=request.user)
@@ -134,3 +138,13 @@ def bot_details(request, bot_id):
         'deals': deals,
     }
     return render(request, 'bots/bot_details.html', context)
+
+@login_required
+def statistics(request, bot_id):
+    bot = get_object_or_404(Bot, id=bot_id, user=request.user)
+    chart_path = generate_pnl_chart(bot_id, f'charts/bot_{bot_id}_pnl.png')
+    context = {
+        'bot': bot,
+        'chart_path': chart_path,
+    }
+    return render(request, 'bots/statistics.html', context)

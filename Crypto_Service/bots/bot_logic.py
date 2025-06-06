@@ -1,0 +1,541 @@
+import asyncio
+import pybit
+from pybit.unified_trading import HTTP
+from ta.momentum import RSIIndicator
+from ta.trend import CCIIndicator
+from django.conf import settings
+from bots.models import Bot, Deal, ExchangeAccount
+from users.models import User
+import pandas as pd
+import logging
+from django.core.mail import send_mail
+from asgiref.sync import sync_to_async
+import time
+from datetime import datetime
+import math
+
+# Настройка логирования
+logger = logging.getLogger('trading_bot')
+logger.setLevel(logging.INFO)
+
+# Обработчик для вывода в консоль
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+console_handler.setFormatter(formatter)
+logger.addHandler(console_handler)
+
+class TradingBot:
+    def __init__(self, bot_id):
+        self.bot_id = bot_id
+        self.bot = None
+        self.client = None
+        self.running = False
+        self.notified = False  # Флаг для предотвращения спама уведомлениями
+
+    async def initialize(self):
+        """Инициализация бота: загрузка данных из модели и подключение к Bybit."""
+        logger.info(f"Начало инициализации бота ID: {self.bot_id}")
+        try:
+            # Получаем данные бота из базы данных
+            self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
+            logger.info(f"Бот {self.bot_id} успешно загружен из базы данных")
+
+            # Получаем exchange_account и его поля
+            exchange_account = await sync_to_async(lambda: self.bot.exchange_account)()
+            api_key = await sync_to_async(lambda: exchange_account.api_key)()
+            api_secret = await sync_to_async(lambda: exchange_account.api_secret)()
+            self.client = HTTP(
+                api_key=api_key,
+                api_secret=api_secret,
+                testnet=False,  
+                recv_window=10000  # 10 секунд
+            )
+            self.running = await sync_to_async(lambda: self.bot.is_active)()
+            logger.info(f"Бот ID: {self.bot_id} инициализирован, is_active: {self.running}")
+            self.notified = False  # Сбрасываем флаг уведомлений
+        except Bot.DoesNotExist:
+            logger.error(f"Бот с ID {self.bot_id} не найден")
+            if not self.notified:
+                await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
+                self.notified = True
+            self.running = False
+        except Exception as e:
+            logger.error(f"Ошибка инициализации бота {self.bot_id}: {e}", exc_info=True)
+            if not self.notified:
+                await sync_to_async(self.notify_admin)(f"Ошибка инициализации бота {self.bot_id}: {str(e)}")
+                self.notified = True
+            self.running = False
+
+    def notify_admin(self, message):
+        """Отправка уведомления администратору."""
+        try:
+            send_mail(
+                subject=f'Ошибка в боте {self.bot_id}',
+                message=message,
+                from_email=None,
+                recipient_list=[settings.ADMIN_EMAIL],
+                fail_silently=True,
+            )
+            logger.info(f"Уведомление отправлено администратору: {message}")
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления администратору: {e}")
+
+    async def check_time_sync(self):
+        """Проверка синхронизации времени с сервером Bybit."""
+        try:
+            server_time = self.client.get_server_time()
+            server_timestamp = int(server_time['result']['timeSecond'])
+            local_timestamp = int(time.time())
+            time_diff = abs(server_timestamp - local_timestamp)
+            logger.info(f"Серверное время Bybit: {server_timestamp}, Локальное время: {local_timestamp}, Разница: {time_diff} сек")
+            if time_diff > 2:  # Допустимая разница 2 секунды
+                logger.warning(f"Время не синхронизировано! Разница: {time_diff} секунд")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(
+                        f"Время не синхронизировано для бота {self.bot_id}. Разница: {time_diff} секунд"
+                    )
+                    self.notified = True
+                return False
+            logger.info("Время синхронизировано успешно")
+            return True
+        except Exception as e:
+            logger.error(f"Ошибка при проверке времени сервера: {e}")
+            if not self.notified:
+                await sync_to_async(self.notify_admin)(f"Ошибка при проверки времени сервера для бота {self.bot_id}: {str(e)}")
+                self.notified = True
+            return False
+
+    async def get_symbol_specs(self, symbol):
+        """Получение спецификаций торговой пары."""
+        logger.info(f"Получение спецификаций для {symbol}")
+        try:
+            response = self.client.get_instruments_info(category="linear", symbol=symbol)
+            if 'result' not in response or 'list' not in response['result']:
+                logger.error(f"Некорректный ответ от Bybit API для {symbol}: {response}")
+                return None
+            symbol_info = response['result']['list'][0]
+            lot_size_filter = symbol_info.get('lotSizeFilter', {})
+            return {
+                'qty_step': float(lot_size_filter.get('qtyStep', 0.1)),
+                'min_order_qty': float(lot_size_filter.get('minOrderQty', 0.1)),
+                'max_order_qty': float(lot_size_filter.get('maxOrderQty', float('inf'))),
+                'min_notional': float(lot_size_filter.get('minNotional', 5.0))  # Минимальная стоимость ордера
+            }
+        except Exception as e:
+            logger.error(f"Ошибка при получении спецификаций для {symbol}: {e}", exc_info=True)
+            if not self.notified:
+                await sync_to_async(self.notify_admin)(f"Ошибка при получении спецификаций для {symbol} в боте {self.bot_id}: {str(e)}")
+                self.notified = True
+            return None
+
+    async def get_kline_data(self, symbol, timeframe):
+        """Получение данных свечей для расчета индикаторов."""
+        logger.info(f"Получение данных свечей для {symbol} на таймфрейме {timeframe}")
+        try:
+            # Преобразуем timeframe в числовой формат, если он указан как '1m'
+            interval = timeframe.replace('m', '') if timeframe.endswith('m') else timeframe
+            response = self.client.get_kline(
+                category="linear",
+                symbol=symbol,
+                interval=interval,
+                limit=100
+            )
+            if 'result' not in response or 'list' not in response['result']:
+                logger.error(f"Некорректный ответ от Bybit API для {symbol}: {response}")
+                return None
+
+            df = pd.DataFrame(response['result']['list'], columns=[
+                'start_time', 'open', 'high', 'low', 'close', 'volume', 'turnover'
+            ])
+            df['open'] = df['open'].astype(float)
+            df['high'] = df['high'].astype(float)
+            df['low'] = df['low'].astype(float)
+            df['close'] = df['close'].astype(float)
+            logger.debug(f"Получены данные свечей для {symbol} на таймфрейме {timeframe}")
+            return df
+        except Exception as e:
+            logger.error(f"Ошибка при получении данных свечей для {symbol}: {e}", exc_info=True)
+            return None
+
+    async def check_indicators(self):
+        """Проверка сигналов индикаторов."""
+        bot_name = await sync_to_async(lambda: self.bot.name)()
+        logger.info(f"Проверка индикаторов для бота {bot_name}")
+        signals = []
+        # Преобразуем QuerySet в список, чтобы избежать ленивых запросов
+        indicators = await sync_to_async(lambda: list(self.bot.indicators.all()))()
+        trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+        for indicator in indicators:
+            # Получаем поля индикатора через sync_to_async
+            indicator_type = await sync_to_async(lambda: indicator.indicator_type)()
+            timeframe = await sync_to_async(lambda: indicator.timeframe)()
+            parameters = await sync_to_async(lambda: indicator.parameters)()
+            
+            df = await self.get_kline_data(trading_pair, timeframe)
+            if df is None:
+                logger.warning(f"Не удалось получить данные для индикатора {indicator_type}")
+                return False
+
+            try:
+                if indicator_type == 'RSI':
+                    rsi = RSIIndicator(close=df['close'], window=14).rsi()
+                    latest_rsi = rsi.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    
+                    if condition == 'gt' and latest_rsi > value:
+                        signals.append(True)
+                    elif condition == 'gte' and latest_rsi >= value:
+                        signals.append(True)
+                    elif condition == 'lt' and latest_rsi < value:
+                        signals.append(True)
+                    elif condition == 'lte' and latest_rsi <= value:
+                        signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"RSI: {latest_rsi}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'CCI':
+                    cci = CCIIndicator(high=df['high'], low=df['low'], close=df['close'], window=20).cci()
+                    latest_cci = cci.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    
+                    if condition == 'gt' and latest_cci > value:
+                        signals.append(True)
+                    elif condition == 'gte' and latest_cci >= value:
+                        signals.append(True)
+                    elif condition == 'lt' and latest_cci < value:
+                        signals.append(True)
+                    elif condition == 'lte' and latest_cci <= value:
+                        signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"CCI: {latest_cci}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+            except Exception as e:
+                logger.error(f"Ошибка при расчете индикатора {indicator_type}: {e}")
+                signals.append(False)
+
+        result = all(signals)
+        logger.info(f"Проверка индикаторов для бота {bot_name}: {'Сигнал получен' if result else 'Сигнал не получен'}")
+        return result
+
+    async def place_orders(self):
+        """Размещение рыночного и лимитных ордеров."""
+        bot_name = await sync_to_async(lambda: self.bot.name)()
+        logger.info(f"Размещение ордеров для бота {bot_name}")
+        try:
+            # Проверяем синхронизацию времени перед размещением ордеров
+            if not await self.check_time_sync():
+                logger.error("Не удалось разместить ордера из-за ошибки синхронизации времени")
+                return False
+
+            trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+            deposit = await sync_to_async(lambda: self.bot.deposit)()
+            grid_orders_count = await sync_to_async(lambda: self.bot.grid_orders_count)()
+            strategy = await sync_to_async(lambda: self.bot.strategy)()
+            bot_leverage = await sync_to_async(lambda: self.bot.bot_leverage)()
+            take_profit_percent = await sync_to_async(lambda: self.bot.take_profit_percent)()
+            stop_loss_percent = await sync_to_async(lambda: self.bot.stop_loss_percent)()
+            grid_overlap_percent = await sync_to_async(lambda: self.bot.grid_overlap_percent)()
+
+            # Получаем спецификации торговой пары
+            specs = await self.get_symbol_specs(trading_pair)
+            if not specs:
+                logger.error(f"Не удалось получить спецификации для {trading_pair}")
+                return False
+            qty_step = specs['qty_step']
+            min_order_qty = specs['min_order_qty']
+            max_order_qty = specs['max_order_qty']
+            min_notional = specs['min_notional']  # Минимальная стоимость ордера в USDT
+
+            ticker = self.client.get_tickers(category="linear", symbol=trading_pair)
+            current_price = float(ticker['result']['list'][0]['lastPrice'])
+            logger.info(f"Текущая цена {trading_pair}: {current_price}")
+
+            # Рассчитываем количество с учетом минимальной стоимости ордера
+            min_qty_for_notional = min_notional / current_price  # Минимальное количество для достижения min_notional
+            order_qty = deposit / grid_orders_count / current_price
+            # Округляем до ближайшего значения, кратного qty_step
+            order_qty = math.ceil(max(min_qty_for_notional, order_qty) / qty_step) * qty_step
+            # Проверяем, что qty соответствует минимальному и максимальному объему
+            if order_qty < min_order_qty:
+                order_qty = min_order_qty
+            if order_qty > max_order_qty:
+                logger.error(f"Рассчитанное количество {order_qty} превышает максимальный объем {max_order_qty} для {trading_pair}")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(
+                        f"Рассчитанное количество {order_qty} превышает максимальный объем {max_order_qty} для {trading_pair} в боте {self.bot_id}"
+                    )
+                    self.notified = True
+                return False
+
+            order_value = order_qty * current_price
+            if order_value < min_notional:
+                logger.error(f"Стоимость ордера {order_value} USDT меньше минимальной {min_notional} USDT для {trading_pair}")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(
+                        f"Стоимость ордера {order_value} USDT меньше минимальной {min_notional} USDT для {trading_pair} в боте {self.bot_id}"
+                    )
+                    self.notified = True
+                return False
+
+            logger.info(f"Рассчитанное количество для ордера: {order_qty} (шаг: {qty_step}, минимальный объем: {min_order_qty}, минимальная стоимость: {min_notional} USDT)")
+
+            side = "Buy" if strategy else "Sell"
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    market_order = self.client.place_order(
+                        category="linear",
+                        symbol=trading_pair,
+                        side=side,
+                        orderType="Market",
+                        qty=str(order_qty),  # Передаем как строку для точности
+                        leverage=bot_leverage
+                    )
+                    order_id = market_order['result']['orderId']
+                    break
+                except Exception as e:
+                    if "ErrCode: 10001" in str(e):
+                        logger.warning(f"Ошибка количества (попытка {attempt + 1}/{max_retries}): {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1)
+                            continue
+                    elif "ErrCode: 10002" in str(e):
+                        logger.warning(f"Ошибка синхронизации времени (попытка {attempt + 1}/{max_retries}): {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1)
+                            continue
+                    elif "ErrCode: 110094" in str(e):
+                        logger.warning(f"Ошибка минимальной стоимости ордера (попытка {attempt + 1}/{max_retries}): {e}")
+                        if attempt < max_retries - 1:
+                            await asyncio.sleep(1)
+                            continue
+                    raise e
+            else:
+                logger.error(f"Не удалось разместить рыночный ордер после {max_retries} попыток")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"Не удалось разместить рыночный ордер для бота {self.bot_id} после {max_retries} попыток")
+                    self.notified = True
+                return False
+
+            order_info =  self.client.get_order_history(
+                category="linear",
+                symbol=trading_pair,
+                orderId=order_id
+            )
+            exchange_commission = float(order_info['result']['list'][0].get('commission', 0.0))
+
+            deal = await sync_to_async(Deal.objects.create)(
+                bot=self.bot,
+                entry_price=current_price,
+                take_profit_price=current_price * (1 + take_profit_percent / 100) if strategy else current_price * (1 - take_profit_percent / 100),
+                stop_loss_price=current_price * (1 - stop_loss_percent / 100) if stop_loss_percent and strategy else current_price * (1 + stop_loss_percent / 100) if stop_loss_percent else None,
+                exchange_commission=exchange_commission,
+                service_commission=0.0,
+                volume=order_qty,
+                pnl=0.0,
+                trading_pair=trading_pair,
+                order_id=order_id
+            )
+            logger.info(f"Рыночный ордер размещен: {order_id}, объем: {order_qty}")
+
+            price_step = current_price * (grid_overlap_percent / 100) / (grid_orders_count - 1)
+            for i in range(1, grid_orders_count):
+                limit_price = current_price - price_step * i if strategy else current_price + price_step * i
+                for attempt in range(max_retries):
+                    try:
+                        limit_order = await self.client.place_order(
+                            category="linear",
+                            symbol=trading_pair,
+                            side=side,
+                            orderType="Limit",
+                            qty=str(order_qty),  # Передаем как строку для точности
+                            price=round(limit_price, 2)
+                        )
+                        break
+                    except Exception as e:
+                        if "ErrCode: 10001" in str(e):
+                            logger.warning(f"Ошибка количества при размещении лимитного ордера (попытка {attempt + 1}/{max_retries}): {e}")
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(1)
+                                continue
+                        elif "ErrCode: 10002" in str(e):
+                            logger.warning(f"Ошибка синхронизации времени при размещении лимитного ордера (попытка {attempt + 1}/{max_retries}): {e}")
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(1)
+                                continue
+                        elif "ErrCode: 110094" in str(e):
+                            logger.warning(f"Ошибка минимальной стоимости лимитного ордера (попытка {attempt + 1}/{max_retries}): {e}")
+                            if attempt < max_retries - 1:
+                                await asyncio.sleep(1)
+                                continue
+                        raise e
+                else:
+                    logger.error(f"Не удалось разместить лимитный ордер после {max_retries} попыток")
+                    if not self.notified:
+                        await sync_to_async(self.notify_admin)(f"Не удалось разместить лимитный ордер для бота {self.bot_id} после {max_retries} попыток")
+                        self.notified = True
+                    continue
+
+                await sync_to_async(Deal.objects.create)(
+                    bot=self.bot,
+                    entry_price=limit_price,
+                    take_profit_price=limit_price * (1 + take_profit_percent / 100) if strategy else limit_price * (1 - take_profit_percent / 100),
+                    stop_loss_price=limit_price * (1 - stop_loss_percent / 100) if stop_loss_percent and strategy else limit_price * (1 + stop_loss_percent / 100) if stop_loss_percent else None,
+                    exchange_commission=0.0,
+                    service_commission=0.0,
+                    volume=order_qty,
+                    pnl=0.0,
+                    trading_pair=trading_pair,
+                    order_id=limit_order['result']['orderId']
+                )
+                logger.info(f"Лимитный ордер размещен: {limit_order['result']['orderId']}, цена: {limit_price}")
+
+            return True  # Успешное размещение ордеров
+
+        except Exception as e:
+            logger.error(f"Ошибка при размещении ордеров для бота {bot_name}: {e}", exc_info=True)
+            if not self.notified:
+                await sync_to_async(self.notify_admin)(f"Ошибка при размещении ордеров для бота {self.bot_id}: {str(e)}")
+                self.notified = True
+            return False
+
+    async def monitor_orders(self):
+        """Отслеживание TP/SL и закрытие ордеров."""
+        bot_name = await sync_to_async(lambda: self.bot.name)()
+        logger.info(f"Начало мониторинга ордеров для бота {bot_name}")
+        while self.running:
+            try:
+                # Обновляем данные бота
+                self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
+                is_active = await sync_to_async(lambda: self.bot.is_active)()
+                trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+                if not is_active:
+                    self.running = False
+                    await self.client.cancel_all_orders(category="linear", symbol=trading_pair)
+                    logger.info(f"Бот {bot_name} остановлен")
+                    return
+
+                # Получаем текущую цену
+                ticker = self.client.get_tickers(category="linear", symbol=trading_pair)
+                current_price = float(ticker['result']['list'][0]['lastPrice'])
+                
+                # Получаем активные сделки
+                deals = await sync_to_async(lambda: list(Deal.objects.filter(bot=self.bot, is_active=True)))()
+                if not deals:
+                    logger.info(f"Нет активных сделок для бота {bot_name}")
+                    return
+
+                # Рассчитываем средние TP и SL
+                strategy = await sync_to_async(lambda: self.bot.strategy)()
+                avg_tp = sum(deal.take_profit_price for deal in deals) / len(deals)
+                avg_sl = (
+                    sum(deal.stop_loss_price for deal in deals if deal.stop_loss_price) / len(deals)
+                    if any(deal.stop_loss_price for deal in deals)
+                    else None
+                )
+
+                # Проверяем условия закрытия позиции
+                close_position = False
+                if strategy:
+                    if current_price >= avg_tp or (avg_sl and current_price <= avg_sl):
+                        close_position = True
+                else:
+                    if current_price <= avg_tp or (avg_sl and current_price >= avg_sl):
+                        close_position = True
+
+                if close_position:
+                    await self.client.cancel_all_orders(category="linear", symbol=trading_pair)
+                    for deal in deals:
+                        order_info = await self.client.get_order_history(
+                            category="linear",
+                            symbol=trading_pair,
+                            orderId=deal.order_id
+                        )
+                        order_status = order_info['result']['list'][0].get('orderStatus')
+                        if order_status != 'Filled':
+                            continue
+
+                        exit_price = current_price
+                        entry_price = deal.entry_price
+                        qty = deal.volume
+                        pnl = (exit_price - entry_price) * qty if strategy else (entry_price - exit_price) * qty
+                        deal.pnl = pnl
+                        
+                        service_commission = max(0, pnl * 0.1)
+                        deal.service_commission = service_commission
+                        deal.is_active = False
+                        await sync_to_async(deal.save)()
+
+                        if service_commission > 0:
+                            user = await sync_to_async(lambda: self.bot.user)()
+                            user.balance -= service_commission
+                            await sync_to_async(user.save)()
+                            logger.info(f"Списана комиссия сервиса {service_commission} с баланса пользователя {user.email}")
+
+                    logger.info(f"Позиции закрыты для бота {bot_name}")
+                    return
+
+                await asyncio.sleep(10)
+            except Bot.DoesNotExist:
+                logger.error(f"Бот с ID {self.bot_id} не найден")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
+                    self.notified = True
+                self.running = False
+                return
+            except Exception as e:
+                logger.error(f"Ошибка при мониторинге ордеров для бота {bot_name}: {e}", exc_info=True)
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"Ошибка при мониторинге ордеров для бота {self.bot_id}: {str(e)}")
+                    self.notified = True
+                await asyncio.sleep(10)
+
+    async def run(self):
+        """Основной цикл бота."""
+        logger.info(f"Запуск основного цикла бота {self.bot_id}")
+        await self.initialize()
+        if not self.running:
+            logger.info(f"Бот {self.bot_id} не запущен из-за ошибки инициализации")
+            return
+
+        while self.running:
+            try:
+                self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
+                is_active = await sync_to_async(lambda: self.bot.is_active)()
+                bot_name = await sync_to_async(lambda: self.bot.name)()
+                if not is_active:
+                    self.running = False
+                    logger.info(f"Бот {bot_name} остановлен")
+                    return
+
+                if await self.check_indicators():
+                    success = await self.place_orders()
+                    if success:
+                        await self.monitor_orders()
+                    else:
+                        logger.info(f"Мониторинг ордеров пропущен для бота {bot_name} из-за ошибки размещения ордеров")
+                await asyncio.sleep(10)
+            except Bot.DoesNotExist:
+                logger.error(f"Бот с ID {self.bot_id} не найден")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
+                    self.notified = True
+                self.running = False
+                return
+            except Exception as e:
+                logger.error(f"Ошибка в цикле бота {self.bot_id}: {e}", exc_info=True)
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"Ошибка в цикле бота {self.bot_id}: {str(e)}")
+                    self.notified = True
+                await asyncio.sleep(10)
+
+async def start_bot(bot_id):
+    """Запуск бота."""
+    logger.info(f"Запуск бота с ID: {bot_id}")
+    bot = TradingBot(bot_id)
+    await bot.run()

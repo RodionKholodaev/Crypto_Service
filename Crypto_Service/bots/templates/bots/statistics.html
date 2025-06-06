@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Статистика бота</title>
+</head>
+<body>
+    <h1>Статистика для бота {{ bot.name }}</h1>
+    {% if chart_path %}
+        <img src="/media/{{ chart_path }}" alt="PNL Chart">
+    {% else %}
+        <p>Нет данных для отображения</p>
+    {% endif %}
+    <a href="{% url 'my_bots' %}">Назад к списку ботов</a>
+</body>
+</html>
