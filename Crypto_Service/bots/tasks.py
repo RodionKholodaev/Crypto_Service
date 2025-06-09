@@ -1,5 +1,5 @@
 from celery import shared_task
-from bots.bot_logic import start_bot
+from bots.bot_logic_ccxt import start_bot
 import asyncio
 
 # создает задачу для celery

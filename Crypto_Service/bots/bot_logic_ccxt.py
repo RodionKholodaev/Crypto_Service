@@ -55,6 +55,8 @@ class TradingBot:
                 'secret': api_secret,
                 'enableRateLimit': True,
                 'asyncio_loop': asyncio.get_event_loop(),
+                'defaultType': 'future',  # Фьючерсы
+                'enableUnifiedAccount': True,  # Для USDT-фьючерсов
             })
             # Устанавливаем тестовую сеть (отключено для реальной торговли)
             self.client.set_sandbox_mode(False)
@@ -163,7 +165,10 @@ class TradingBot:
         logger.info(f"Проверка индикаторов для бота {bot_name}")
         signals = []
         indicators = await sync_to_async(lambda: list(self.bot.indicators.all()))()
-        trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+
+        trading_pair_raw = await sync_to_async(lambda: self.bot.trading_pair)()
+        trading_pair = f"{trading_pair_raw[:-4]}/{trading_pair_raw[-4:]}:USDT"
+
         for indicator in indicators:
             indicator_type = await sync_to_async(lambda: indicator.indicator_type)()
             timeframe = await sync_to_async(lambda: indicator.timeframe)()
@@ -228,7 +233,9 @@ class TradingBot:
                 logger.error("Не удалось разместить ордера из-за ошибки синхронизации времени")
                 return False
 
-            trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+            trading_pair_raw = await sync_to_async(lambda: self.bot.trading_pair)()
+            trading_pair = f"{trading_pair_raw[:-4]}/{trading_pair_raw[-4:]}:USDT"
+            
             deposit = await sync_to_async(lambda: self.bot.deposit)()
             grid_orders_count = await sync_to_async(lambda: self.bot.grid_orders_count)()
             strategy = await sync_to_async(lambda: self.bot.strategy)()
@@ -251,10 +258,17 @@ class TradingBot:
             logger.info(f"Текущая цена {trading_pair}: {current_price}")
 
             min_qty_for_notional = min_notional / current_price
-            order_qty = deposit / grid_orders_count / current_price
+            order_qty = (deposit / grid_orders_count * bot_leverage) / current_price
+            order_qty = max(min_qty_for_notional, order_qty)
+            order_qty = math.floor(order_qty / qty_step) * qty_step
             order_qty = math.ceil(max(min_qty_for_notional, order_qty) / qty_step) * qty_step
+
             if order_qty < min_order_qty:
-                order_qty = min_order_qty
+                logger.error(f"Рассчитанное количество {order_qty} меньше минимального объема {min_order_qty} для {trading_pair}")
+                if not self.notified:
+                    await sync_to_async(self.notify_admin)(f"рассчитанное количество {order_qty} меньше минимального объема {min_order_qty} для {trading_pair}")
+                return False
+            
             if order_qty > max_order_qty:
                 logger.error(f"Рассчитанное количество {order_qty} превышает максимальный объем {max_order_qty} для {trading_pair}")
                 if not self.notified:
@@ -312,8 +326,8 @@ class TradingBot:
                     await sync_to_async(self.notify_admin)(f"Не удалось разместить рыночный ордер для бота {self.bot_id} после {max_retries} попыток")
                     self.notified = True
                 return False
-
-            order_info = await self.client.fetch_order(order_id, trading_pair)
+            # начало обработки лимитных ордеров
+            order_info = await self.client.fetchOpenOrder(order_id, trading_pair)
             exchange_commission = float(order_info.get('fee', {}).get('cost', 0.0))
 
             deal = await sync_to_async(Deal.objects.create)(
@@ -394,7 +408,10 @@ class TradingBot:
             try:
                 self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
                 is_active = await sync_to_async(lambda: self.bot.is_active)()
-                trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+
+                trading_pair_raw = await sync_to_async(lambda: self.bot.trading_pair)()
+                trading_pair = f"{trading_pair_raw[:-4]}/{trading_pair_raw[-4:]}:USDT"
+
                 if not is_active:
                     self.running = False
                     await self.client.cancel_orders(trading_pair)
