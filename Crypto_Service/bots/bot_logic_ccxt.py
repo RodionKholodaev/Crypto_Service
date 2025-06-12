@@ -13,6 +13,7 @@ import time
 from datetime import datetime
 import math
 
+
 # Настройка логирования
 logger = logging.getLogger('trading_bot')
 logger.setLevel(logging.INFO)
@@ -326,17 +327,24 @@ class TradingBot:
                     await sync_to_async(self.notify_admin)(f"Не удалось разместить рыночный ордер для бота {self.bot_id} после {max_retries} попыток")
                     self.notified = True
                 return False
+            
             # начало обработки лимитных ордеров
-            order_info = await self.client.fetchOpenOrder(order_id, trading_pair)
+            order_info = await self.safe_fetch_order(order_id, trading_pair)
+            # получение данных по комисии биржы
             exchange_commission = float(order_info.get('fee', {}).get('cost', 0.0))
 
+            # запись в бд 
+            # не записывает время, а это важно!!!
             deal = await sync_to_async(Deal.objects.create)(
                 bot=self.bot,
                 entry_price=current_price,
                 take_profit_price=current_price * (1 + take_profit_percent / 100) if strategy else current_price * (1 - take_profit_percent / 100),
                 stop_loss_price=current_price * (1 - stop_loss_percent / 100) if stop_loss_percent and strategy else current_price * (1 + stop_loss_percent / 100) if stop_loss_percent else None,
+                is_active=True,
+                # время записи, пока не понятно какое
+                created_at=datetime.now(),
                 exchange_commission=exchange_commission,
-                service_commission=0.0,
+                service_commission=0.0, # нужно будет потом исправить
                 volume=order_qty,
                 pnl=0.0,
                 trading_pair=trading_pair,
@@ -403,7 +411,7 @@ class TradingBot:
     async def monitor_orders(self):
         """Отслеживание TP/SL и закрытие ордеров."""
         bot_name = await sync_to_async(lambda: self.bot.name)()
-        logger.info(f"Начало мониторинга ордеров для бота {bot_name}")
+        logger.info(f"начали мониторить бота {bot_name}")
         while self.running:
             try:
                 self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
@@ -411,6 +419,8 @@ class TradingBot:
 
                 trading_pair_raw = await sync_to_async(lambda: self.bot.trading_pair)()
                 trading_pair = f"{trading_pair_raw[:-4]}/{trading_pair_raw[-4:]}:USDT"
+
+                logger.info(f"получили данные из бд")
 
                 if not is_active:
                     self.running = False
@@ -422,6 +432,7 @@ class TradingBot:
                 current_price = float(ticker['last'])
                 
                 deals = await sync_to_async(lambda: list(Deal.objects.filter(bot=self.bot, is_active=True)))()
+                logger.info(f"получили сделки из бд, количество {len(deals)}")
                 if not deals:
                     logger.info(f"Нет активных сделок для бота {bot_name}")
                     return
@@ -433,19 +444,60 @@ class TradingBot:
                     if any(deal.stop_loss_price for deal in deals)
                     else None
                 )
-
+# беда тут      
+                logging.info('проверка текущей цены для выхода из сделки')
                 close_position = False
                 if strategy:
                     if current_price >= avg_tp or (avg_sl and current_price <= avg_sl):
+                        logging.info('выход по tp или sl (long)')
                         close_position = True
                 else:
                     if current_price <= avg_tp or (avg_sl and current_price >= avg_sl):
+                        logging.info('выход по tp или sl (short)')
                         close_position = True
 
                 if close_position:
-                    await self.client.cancel_orders(trading_pair)
+                    logger.info(f"отменяем все незакрытые ордера")
+                    await self.client.cancel_all_orders(symbol=trading_pair)
+
+                    # Новый рыночный ордер для выхода из позиции
+                    total_qty = sum(float(deal.volume) for deal in deals)
+                    side = "sell" if strategy else "buy"  # Противоположная сторона
+                    logger.info(f"создаем ордер в противоположном направлении для закрытия ордеров. их суммарный объем {total_qty}")
+                    try:
+                        close_order = await self.client.create_order(
+                            symbol=trading_pair,
+                            type='market',
+                            side=side,
+                            amount=total_qty
+                        )
+                        logger.info(f"Создан рыночный ордер на закрытие позиции: {close_order['id']}, объем: {total_qty}")
+                        # Подождем чуть-чуть, чтобы биржа успела обработать
+                        await asyncio.sleep(2)
+
+
+                        # Проверяем, действительно ли позиция закрыта
+                        position = await self.client.fetch_position(trading_pair)
+                        position_size = abs(float(position['contracts'] if 'contracts' in position else position['size']))
+                        
+                        if position_size > 0:
+                            logger.warning(f"Позиция по {trading_pair} не закрыта! Остаток: {position_size}")
+                            # Тут можно повторить попытку или отправить уведомление
+                            return  # Прерываем, чтобы не записывать фиктивный PnL
+
+
+
+                    except Exception as e:
+                        logger.error(f"Ошибка при попытке закрыть позицию рыночным ордером: {e}")
+                        return  # Без закрытия позиции дальше смысла нет
+
+
+
                     for deal in deals:
-                        order_info = await self.client.fetch_order(deal.order_id, trading_pair)
+                        # тут беда, мы не можем получить ордера, которые отменили ранее
+                        order_info = await self.safe_fetch_order(deal.order_id, trading_pair)
+                        logger.info(f"выполнелась невозможная операция. вывод {order_info}")
+
                         if order_info['status'] != 'closed' or not order_info['filled']:
                             continue
 
@@ -462,7 +514,13 @@ class TradingBot:
 
                         if service_commission > 0:
                             user = await sync_to_async(lambda: self.bot.user)()
-                            user.balance -= service_commission
+
+                            logger.info(f"сейчас будем применять сомнительныю функцию Decimal")
+
+                            user.balance -= Decimal(str(service_commission))
+
+                            logger.info(f"применили Decimal, получили {user.balance}")
+
                             await sync_to_async(user.save)()
                             logger.info(f"Списана комиссия сервиса {service_commission} с баланса пользователя {user.email}")
 
@@ -486,8 +544,9 @@ class TradingBot:
 
     async def run(self):
         """Основной цикл бота."""
-        logger.info(f"Запуск основного цикла бота {self.bot_id}")
+        logger.info(f"начало run {self.bot_id}")
         await self.initialize()
+        logger.info(f"инициализация выполнена")
         if not self.running:
             logger.info(f"Бот {self.bot_id} не запущен из-за ошибки инициализации")
             return
@@ -497,17 +556,31 @@ class TradingBot:
                 self.bot = await sync_to_async(Bot.objects.get)(id=self.bot_id)
                 is_active = await sync_to_async(lambda: self.bot.is_active)()
                 bot_name = await sync_to_async(lambda: self.bot.name)()
+                trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+
+                logger.info(f"получены данные из бд {is_active}, {bot_name}, {trading_pair}")
+
                 if not is_active:
                     self.running = False
                     logger.info(f"Бот {bot_name} остановлен")
                     return
 
                 if await self.check_indicators():
-                    success = await self.place_orders()
-                    if success:
+                    logger.info(f"инидикаторы проверены")
+                    orders = await self.client.fetch_open_orders(trading_pair)
+                    logger.info(f"все ордера получены. количество: {len(orders)}")
+                    if len(orders)>0:
+                        logger.info(f"все ордера уже размещены, идем мониторить")
                         await self.monitor_orders()
+                
                     else:
-                        logger.info(f"Мониторинг ордеров пропущен для бота {bot_name} из-за ошибки размещения ордеров")
+                        success = await self.place_orders()
+                        if success:
+                            logger.info(f"разместили ордера, идем мониторить")
+                            await self.monitor_orders()
+                        else:
+                            logger.info(f"Мониторинг ордеров пропущен для бота {bot_name} из-за ошибки размещения ордеров")
+
                 await asyncio.sleep(10)
         except Bot.DoesNotExist:
             logger.error(f"Бот с ID {self.bot_id} не найден")
@@ -524,6 +597,18 @@ class TradingBot:
         finally:
             if self.client:
                 await self.client.close()
+
+    # безопасное получение данных по ордерам
+    async def safe_fetch_order(self, order_id, symbol):
+        try:
+            # Пробуем современный метод (snake_case)
+            return await self.client.fetchOpenOrder(order_id, symbol)
+        except (AttributeError, ccxt.NotSupported):
+            # Если не поддерживается — пробуем старый (camelCase)
+            return await self.client.fetch_order(order_id, symbol)
+        except Exception as e:
+            logger.error(f"Ошибка при получении ордера {order_id}: {e}")
+            raise
 
 async def start_bot(bot_id):
     """Запуск бота."""
