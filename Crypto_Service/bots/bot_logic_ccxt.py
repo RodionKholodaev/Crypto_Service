@@ -58,6 +58,7 @@ class TradingBot:
                 'asyncio_loop': asyncio.get_event_loop(),
                 'defaultType': 'future',  # Фьючерсы
                 'enableUnifiedAccount': True,  # Для USDT-фьючерсов
+                'timeout': 30000, # почему-то не получается свзяваться с bybit (увеличил timeout для проверки)
             })
             # Устанавливаем тестовую сеть (отключено для реальной торговли)
             self.client.set_sandbox_mode(False)
