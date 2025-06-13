@@ -333,13 +333,20 @@ class TradingBot:
             # получение данных по комисии биржы
             exchange_commission = float(order_info.get('fee', {}).get('cost', 0.0))
 
-            # запись в бд 
-            # не записывает время, а это важно!!!
+
+            if stop_loss_percent is not None:
+                if strategy:
+                    stop_loss_price=current_price * (1 - stop_loss_percent / 100)
+                else:
+                    stop_loss_price=current_price * (1 + stop_loss_percent / 100)
+            else:
+                stop_loss_price=None
+
             deal = await sync_to_async(Deal.objects.create)(
                 bot=self.bot,
                 entry_price=current_price,
                 take_profit_price=current_price * (1 + take_profit_percent / 100) if strategy else current_price * (1 - take_profit_percent / 100),
-                stop_loss_price=current_price * (1 - stop_loss_percent / 100) if stop_loss_percent and strategy else current_price * (1 + stop_loss_percent / 100) if stop_loss_percent else None,
+                stop_loss_price=stop_loss_price,
                 is_active=True,
                 # время записи, пока не понятно какое
                 created_at=datetime.now(),
@@ -387,12 +394,21 @@ class TradingBot:
                         await sync_to_async(self.notify_admin)(f"Не удалось разместить лимитный ордер для бота {self.bot_id} после {max_retries} попыток")
                         self.notified = True
                     continue
+                
+
+                if stop_loss_percent is not None:
+                    if strategy:
+                        stop_loss_price=limit_price * (1 - stop_loss_percent / 100)
+                    else:
+                        stop_loss_price=limit_price * (1 + stop_loss_percent / 100)
+                else:
+                    stop_loss_price=None
 
                 await sync_to_async(Deal.objects.create)(
                     bot=self.bot,
                     entry_price=limit_price,
                     take_profit_price=limit_price * (1 + take_profit_percent / 100) if strategy else limit_price * (1 - take_profit_percent / 100),
-                    stop_loss_price=limit_price * (1 - stop_loss_percent / 100) if stop_loss_percent and strategy else limit_price * (1 + stop_loss_percent / 100) if stop_loss_percent else None,
+                    stop_loss_price=stop_loss_price,
                     exchange_commission=0.0,
                     service_commission=0.0,
                     volume=order_qty,

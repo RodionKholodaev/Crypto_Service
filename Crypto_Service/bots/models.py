@@ -80,7 +80,7 @@ class Deal(models.Model):
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='deals')
     entry_price = models.DecimalField(max_digits=20, decimal_places=8)
     take_profit_price = models.DecimalField(max_digits=20, decimal_places=8)
-    stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8)
+    stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8,null=True)
     is_active = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     exchange_commission=models.DecimalField(max_digits=20, decimal_places=8)
