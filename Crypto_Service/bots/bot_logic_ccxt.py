@@ -262,7 +262,7 @@ class TradingBot:
             order_qty = (deposit / grid_orders_count * bot_leverage) / current_price
             order_qty = max(min_qty_for_notional, order_qty)
             order_qty = math.floor(order_qty / qty_step) * qty_step
-            order_qty = math.ceil(max(min_qty_for_notional, order_qty) / qty_step) * qty_step
+            
 
             if order_qty < min_order_qty:
                 logger.error(f"Рассчитанное количество {order_qty} меньше минимального объема {min_order_qty} для {trading_pair}")
@@ -362,8 +362,10 @@ class TradingBot:
                             type='limit',
                             side=side,
                             amount=order_qty,
-                            price=round(limit_price, 2)
+                            price=round(limit_price, 6)
                         )
+                        logger.info(f"разместил {i} лимитный на {order_qty} ")
+                        logger.info(f"осталось для следующих ордеров: {deposit-i*order_qty*current_price}")
                         break
                     except ccxt.InvalidOrder as e:
                         logger.warning(f"Ошибка количества при размещении лимитного ордера (попытка {attempt + 1}/{max_retries}): {e}")
@@ -377,6 +379,7 @@ class TradingBot:
                             continue
                     except Exception as e:
                         logger.error(f"Ошибка при размещении лимитного ордера: {e}")
+                        logger.info(f"не смог разместить {i} лимитный ордер на {order_qty} ")
                         raise e
                 else:
                     logger.error(f"Не удалось разместить лимитный ордер после {max_retries} попыток")
@@ -444,7 +447,7 @@ class TradingBot:
                     if any(deal.stop_loss_price for deal in deals)
                     else None
                 )
-# беда тут      
+
                 logging.info('проверка текущей цены для выхода из сделки')
                 close_position = False
                 if strategy:
