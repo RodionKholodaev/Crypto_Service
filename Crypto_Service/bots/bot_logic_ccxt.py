@@ -242,8 +242,8 @@ class TradingBot:
             grid_orders_count = await sync_to_async(lambda: self.bot.grid_orders_count)()
             strategy = await sync_to_async(lambda: self.bot.strategy)()
             bot_leverage = await sync_to_async(lambda: self.bot.bot_leverage)()
-            take_profit_percent = await sync_to_async(lambda: self.bot.take_profit_percent)()
-            stop_loss_percent = await sync_to_async(lambda: self.bot.stop_loss_percent)()
+            take_profit_percent = float(await sync_to_async(lambda: self.bot.take_profit_percent)())
+            stop_loss_percent = float(await sync_to_async(lambda: self.bot.stop_loss_percent)())
             grid_overlap_percent = await sync_to_async(lambda: self.bot.grid_overlap_percent)()
 
             specs = await self.get_symbol_specs(trading_pair)

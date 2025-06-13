@@ -44,8 +44,22 @@ class Bot(models.Model):
     
     # Основные настройки
     trading_pair = models.CharField(max_length=20)
-    take_profit_percent = models.PositiveIntegerField()
-    stop_loss_percent = models.PositiveIntegerField(blank=True, null=True,default=None)
+    # take_profit_percent = models.PositiveIntegerField()
+    # stop_loss_percent = models.PositiveIntegerField(blank=True, null=True,default=None)
+
+    take_profit_percent = models.DecimalField(
+        max_digits=5,         # Максимум 5 цифр (включая дробную часть)
+        decimal_places=1,     # 1 знак после запятой (например: 25.5, 0.1, 100.0)
+        default=5.0,          # Значение по умолчанию (если нужно)
+    )
+
+    stop_loss_percent = models.DecimalField(
+        max_digits=5,
+        decimal_places=1,
+        blank=True,
+        null=True,
+        default=None,
+    )
     
     # Настройки сетки ордеров
     grid_orders_count = models.PositiveIntegerField()
@@ -89,6 +103,5 @@ class Deal(models.Model):
     pnl=models.DecimalField(max_digits=20, decimal_places=8)
     trading_pair=models.CharField(max_length=30)
     order_id = models.CharField(max_length=100, null=True, blank=True)  # ID ордера на Bybit
-
 
 
