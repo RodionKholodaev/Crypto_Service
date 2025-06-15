@@ -6,10 +6,7 @@ class IndicatorForm(forms.ModelForm):
     # списки для ChoiceField
     INDICATOR_CHOICES = [
         ('RSI', 'Relative Strength Index'),
-        ('MACD', 'Moving Average Convergence Divergence'),
-        ('MA', 'Moving Average'),
-        ('BOLL', 'Bollinger Bands'),
-        ('STOCH', 'Stochastic'),
+        ('CCI', 'Commodity Channel Index'),
     ]
     
     TIMEFRAME_CHOICES = [
