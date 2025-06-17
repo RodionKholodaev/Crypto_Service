@@ -71,7 +71,9 @@
                         <div class="card-title">Общая прибыль</div>
                         <i class="fas fa-chart-line" style="color: var(--primary);"></i>
                     </div>
-                    <div class="card-value positive">+2.45%</div>
+                    <div class="card-value {% if weekly_profit_percent >= 0 %}positive{% else %}negative{% endif %}">
+                        {% if weekly_profit_percent >= 0 %}+{% endif %}{{ weekly_profit_percent|floatformat:2 }}%
+                    </div>
                     <div class="card-label">за последние 7 дней</div>
                 </div>
             </div>

@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login
 from .forms import RegisterForm, ProfileForm
 from django.contrib import messages
 
-from bots.models import ExchangeAccount, Bot
+from bots.models import ExchangeAccount, Bot, Deal
 from .forms import ExchangeAccountForm, EditExchangeAccountForm
 
 from .forms import PasswordResetRequestForm, PasswordResetVerifyForm
@@ -17,6 +17,9 @@ from .forms import EmailConfirmationForm
 from .models import EmailConfirmationCode
 
 import ccxt
+
+from django.utils import timezone
+from datetime import timedelta
 
 
 def register_view(request):
@@ -113,7 +116,7 @@ def home_view(request):
     error_message = None
     total_bots_deposit=0
     number_of_bots=0
-
+    
 
     # Получаем первый активный API ключ пользователя для Bybit
     api_key = ExchangeAccount.objects.filter(
@@ -124,9 +127,30 @@ def home_view(request):
     
     # Вычисляем сумму депозитов всех ботов пользователя
     bots = Bot.objects.filter(user=user, is_active=True)
-    total_bots_deposit = sum(bot.deposit for bot in bots)
+    total_bots_deposit = sum(bot.deposit for bot in bots) if bots else 0
 
     number_of_bots=len(bots)
+
+    weekly_profit = 0
+    weekly_profit_percent = 0
+
+    # Фильтруем сделки: закрытые и исполненные за последние 7 дней
+    last_week = timezone.now() - timedelta(days=7)
+    closed_deals = Deal.objects.filter(
+        bot__user=user,
+        is_active=False,
+        is_filled=True,
+        created_at__gte=last_week
+    )
+
+    # Суммируем PnL
+    total_pnl = sum(deal.pnl for deal in closed_deals) if closed_deals else 0
+
+    # Рассчитываем процент прибыли (если есть депозиты)
+    if total_bots_deposit > 0:
+        weekly_profit_percent = (total_pnl / total_bots_deposit) * 100
+
+
 
     if api_key:
         try:
@@ -203,6 +227,8 @@ def home_view(request):
         'balance_error': error_message,
         'total_bots_deposit': total_bots_deposit,  # Добавляем в контекст
         'number_of_bots': number_of_bots,
+        'weekly_profit_percent': weekly_profit_percent,
+        'weekly_profit_absolute': total_pnl,
     })
 
 def profile(request):
