@@ -98,7 +98,20 @@
                 </div>
                 <div class="balance-card">
                     <div class="balance-name">Нереализованный P&L</div>
-                    <div class="balance-value positive">+45.32</div>
+                    <div class="balance-value {% if unrealized_pnl >= 0 %}positive{% else %}negative{% endif %}">
+                        {% if pnl_error %}
+                            Ошибка
+                        {% else %}
+                            {% if unrealized_pnl >= 0 %}+{% endif %}{{ unrealized_pnl|floatformat:2 }}
+                        {% endif %}
+                    </div>
+                    <div class="balance-change">
+                        {% if pnl_error %}
+                            {{ pnl_error }}
+                        {% else %}
+                            Текущие позиции
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 

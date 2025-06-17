@@ -116,6 +116,8 @@ def home_view(request):
     error_message = None
     total_bots_deposit=0
     number_of_bots=0
+    unrealized_pnl = 0  # Инициализируем переменную
+    pnl_error = None  
     
 
     # Получаем первый активный API ключ пользователя для Bybit
@@ -125,6 +127,30 @@ def home_view(request):
         is_active=True
     ).first()
     
+    # получение нереализованного pnl
+    if api_key:
+        try:
+            # Инициализируем подключение к Bybit
+            exchange = ccxt.bybit({
+                'apiKey': api_key.api_key,
+                'secret': api_key.api_secret,
+                'options': {'defaultType': 'unified'},
+                'enableRateLimit': True,
+            })
+
+            # Запрашиваем текущие позиции
+            positions = exchange.fetch_positions()
+            
+            # Суммируем нереализованный PnL для всех открытых позиций
+            for pos in positions:
+                if float(pos['contracts']) > 0:  # Только открытые позиции
+                    unrealized_pnl += float(pos['unrealisedPnl'])
+
+        except Exception as e:
+            pnl_error = f"Ошибка: {str(e)}"
+            print(f"API Bybit error: {e}")  # Логируем для дебага
+
+
     # Вычисляем сумму депозитов всех ботов пользователя
     bots = Bot.objects.filter(user=user, is_active=True)
     total_bots_deposit = sum(bot.deposit for bot in bots) if bots else 0
@@ -229,6 +255,8 @@ def home_view(request):
         'number_of_bots': number_of_bots,
         'weekly_profit_percent': weekly_profit_percent,
         'weekly_profit_absolute': total_pnl,
+        'unrealized_pnl': unrealized_pnl,
+        'pnl_error': pnl_error,
     })
 
 def profile(request):
