@@ -226,6 +226,36 @@ class TradingBot:
         logger.info(f"Проверка индикаторов для бота {bot_name}: {'Сигнал получен' if result else 'Сигнал не получен'}")
         return result
 
+    # отслеживание неисполненных лимитных ордеров
+    async def check_limit_fills(self, current_price: float):
+        """Проверка исполнения лимитных ордеров."""
+        bot_name = await sync_to_async(lambda: self.bot.name)()
+        logger.info(f"Проверка лимитных ордеров для бота {bot_name} при цене {current_price}")
+
+        # Получаем все неисполненные лимитные сделки
+        deals = await sync_to_async(
+            lambda: list(Deal.objects.filter(bot=self.bot, is_filled=False, is_active=False))
+        )()
+        if not deals:
+            logger.info(f"Нет ожидающих лимитных сделок для бота {bot_name}")
+            return
+
+        strategy = await sync_to_async(lambda: self.bot.strategy)()
+
+        for deal in deals:
+            limit_price = float(deal.entry_price)
+
+            if (strategy and current_price <= limit_price) or (not strategy and current_price >= limit_price):
+                logger.info(f"Лимитный ордер {deal.order_id} исполнен по цене {current_price}")
+                deal.is_filled = True
+                deal.is_active = True
+                deal.entry_price = limit_price  # уже есть
+                await sync_to_async(deal.save)()
+
+
+
+
+
     async def place_orders(self):
         """Размещение рыночного и лимитных ордеров."""
         bot_name = await sync_to_async(lambda: self.bot.name)()
@@ -243,7 +273,8 @@ class TradingBot:
             strategy = await sync_to_async(lambda: self.bot.strategy)()
             bot_leverage = await sync_to_async(lambda: self.bot.bot_leverage)()
             take_profit_percent = float(await sync_to_async(lambda: self.bot.take_profit_percent)())
-            stop_loss_percent = float(await sync_to_async(lambda: self.bot.stop_loss_percent)())
+            stop_loss_percent_raw = await sync_to_async(lambda: self.bot.stop_loss_percent)()
+            stop_loss_percent = float(stop_loss_percent_raw) if stop_loss_percent_raw is not None else None
             grid_overlap_percent = await sync_to_async(lambda: self.bot.grid_overlap_percent)()
 
             specs = await self.get_symbol_specs(trading_pair)
@@ -262,7 +293,7 @@ class TradingBot:
             min_qty_for_notional = min_notional / current_price
             order_qty = (deposit / grid_orders_count * bot_leverage) / current_price
             order_qty = max(min_qty_for_notional, order_qty)
-            order_qty = math.floor(order_qty / qty_step) * qty_step
+            order_qty = math.floor(order_qty / qty_step * 1000000) * qty_step / 1000000 # костыли чтобы нормально работало округление
             
 
             if order_qty < min_order_qty:
@@ -349,8 +380,6 @@ class TradingBot:
                 take_profit_price=current_price * (1 + take_profit_percent / 100) if strategy else current_price * (1 - take_profit_percent / 100),
                 stop_loss_price=stop_loss_price,
                 is_active=True,
-                # время записи, пока не понятно какое
-                created_at=datetime.now(),
                 exchange_commission=exchange_commission,
                 service_commission=0.0, # нужно будет потом исправить
                 volume=order_qty,
@@ -405,6 +434,19 @@ class TradingBot:
                 else:
                     stop_loss_price=None
 
+                # await sync_to_async(Deal.objects.create)(
+                #     bot=self.bot,
+                #     entry_price=limit_price,
+                #     take_profit_price=limit_price * (1 + take_profit_percent / 100) if strategy else limit_price * (1 - take_profit_percent / 100),
+                #     stop_loss_price=stop_loss_price,
+                #     exchange_commission=0.0,
+                #     service_commission=0.0,
+                #     volume=order_qty,
+                #     pnl=0.0,
+                #     trading_pair=trading_pair,
+                #     order_id=limit_order['id']
+                # )
+
                 await sync_to_async(Deal.objects.create)(
                     bot=self.bot,
                     entry_price=limit_price,
@@ -415,8 +457,12 @@ class TradingBot:
                     volume=order_qty,
                     pnl=0.0,
                     trading_pair=trading_pair,
-                    order_id=limit_order['id']
+                    order_id=limit_order['id'],
+                    is_active=False,       #  Не активна пока не исполнена
+                    is_filled=False        #  Еще не исполнен
                 )
+
+
                 logger.info(f"Лимитный ордер размещен: {limit_order['id']}, цена: {limit_price}")
 
             return True
@@ -450,6 +496,9 @@ class TradingBot:
 
                 ticker = await self.client.fetch_ticker(trading_pair)
                 current_price = float(ticker['last'])
+                # вызов метода для проверки исполнения лимитных ордеров
+                await self.check_limit_fills(current_price)
+
                 
                 deals = await sync_to_async(lambda: list(Deal.objects.filter(bot=self.bot, is_active=True)))()
                 logger.info(f"получили сделки из бд, количество {len(deals)}")
@@ -527,22 +576,22 @@ class TradingBot:
                         pnl = (exit_price - entry_price) * qty if strategy else (entry_price - exit_price) * qty
                         deal.pnl = pnl
                         
-                        service_commission = max(0, pnl * 0.1)
-                        deal.service_commission = service_commission
+                        deal.service_commission = max(0, pnl * 0.1)
                         deal.is_active = False
+                        deal.is_filled = True
                         await sync_to_async(deal.save)()
 
-                        if service_commission > 0:
+                        if deal.service_commission > 0:
                             user = await sync_to_async(lambda: self.bot.user)()
 
                             logger.info(f"сейчас будем применять сомнительныю функцию Decimal")
 
-                            user.balance -= Decimal(str(service_commission))
+                            user.balance -= Decimal(str(deal.service_commission))
 
                             logger.info(f"применили Decimal, получили {user.balance}")
 
                             await sync_to_async(user.save)()
-                            logger.info(f"Списана комиссия сервиса {service_commission} с баланса пользователя {user.email}")
+                            logger.info(f"Списана комиссия сервиса {deal.service_commission} с баланса пользователя {user.email}")
 
                     logger.info(f"Позиции закрыты для бота {bot_name}")
                     return

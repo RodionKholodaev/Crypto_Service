@@ -1,0 +1,317 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Статистика сделок | CryptoBotHub</title>
+    <link rel="stylesheet" href="{% static 'bots/css/style.css' %}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        {% csrf_token %}
+        <div class="page-header">
+            <h1 class="page-title"><i class="fas fa-chart-pie"></i> Статистика сделок</h1>
+        </div>
+
+        <div class="analytics-controls">
+            <div class="filter-section">
+                <div class="form-group">
+                    <label class="form-label">Период:</label>
+                    <select id="periodSelect" class="form-control">
+                        <option value="7">Последние 7 дней</option>
+                        <option value="30" selected>Последние 30 дней</option>
+                        <option value="90">Последние 3 месяца</option>
+                        <option value="365">Последний год</option>
+                        <option value="custom">Произвольный период</option>
+                    </select>
+                </div>
+                
+                <div class="custom-date-range" id="customDateRange" style="display: none;">
+                    <div class="form-group">
+                        <label class="form-label">С:</label>
+                        <input type="date" id="dateFrom" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">По:</label>
+                        <input type="date" id="dateTo" class="form-control">
+                    </div>
+                </div>
+            </div>
+            
+            <div class="filter-section">
+                <div class="form-group">
+                    <label class="form-label">Боты:</label>
+                    <select id="botSelect" class="form-control" multiple>
+                        {% for bot in user_bots %}
+                            <option value="{{ bot.id }}" selected>{{ bot.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            
+            <button id="applyFilters" class="btn btn-primary">
+                <i class="fas fa-filter"></i> Применить
+            </button>
+        </div>
+
+        <div class="analytics-content">
+            <div class="stats-summary">
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-coins"></i>
+                    </div>
+                    <div class="summary-info">
+                        <span class="summary-label">Общая прибыль</span>
+                        <span class="summary-value positive" id="totalProfit">0.00 USDT</span>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-exchange-alt"></i>
+                    </div>
+                    <div class="summary-info">
+                        <span class="summary-label">Всего сделок</span>
+                        <span class="summary-value" id="totalDeals">0</span>
+                    </div>
+                </div>
+                
+                <div class="summary-card">
+                    <div class="summary-icon">
+                        <i class="fas fa-percentage"></i>
+                    </div>
+                    <div class="summary-info">
+                        <span class="summary-label">Успешных сделок</span>
+                        <span class="summary-value" id="successRate">0%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="deals-table-container">
+                <h3>Последние сделки</h3>
+                <table class="deals-table">
+                    <thead>
+                        <tr>
+                            <th>Бот</th>
+                            <th>Пара</th>
+                            <th>Дата</th>
+                            <th>Направление</th>
+                            <th>Объем (USDT)</th>
+                            <th>PnL (USDT)</th>
+                            <th>Комиссия сервиса</th>
+                        </tr>
+                    </thead>
+                    <tbody id="dealsTableBody">
+                        <!-- Заполняем 10 строк, даже если данных нет -->
+                        {% for i in "x"|rjust:"10" %}
+                        <tr>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                            <td>-</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="charts-row">
+                <div class="chart-container">
+                    <h3>Распределение PnL</h3>
+                    <canvas id="pnlDistributionChart"></canvas>
+                </div>
+                
+                <div class="chart-container">
+                    <h3>Динамика прибыли</h3>
+                    <canvas id="profitChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Переключение отображения кастомного диапазона дат
+            const periodSelect = document.getElementById('periodSelect');
+            const customDateRange = document.getElementById('customDateRange');
+            
+            periodSelect.addEventListener('change', function() {
+                customDateRange.style.display = this.value === 'custom' ? 'flex' : 'none';
+            });
+            
+            // Инициализация чартов
+            const pnlCtx = document.getElementById('pnlDistributionChart').getContext('2d');
+            const profitCtx = document.getElementById('profitChart').getContext('2d');
+            
+            let pnlChart = new Chart(pnlCtx, {
+                type: 'pie',
+                data: {
+                    labels: ['Прибыль', 'Убыток', 'Комиссия сервиса'],
+                    datasets: [{
+                        data: [0, 0, 0],
+                        backgroundColor: [
+                            '#00b894', // зеленый для прибыли
+                            '#d63031', // красный для убытка
+                            '#6c5ce7'  // фиолетовый для комиссии сервиса
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.label}: ${context.raw.toFixed(2)} USDT`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            let profitChart = new Chart(profitCtx, {
+                type: 'bar',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: 'Прибыль (USDT)',
+                        data: [],
+                        backgroundColor: '#6c5ce7'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            title: {
+                                display: true,
+                                text: 'USDT'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Дата'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.raw.toFixed(2)}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Функция для загрузки данных
+            function loadAnalyticsData() {
+                const period = periodSelect.value;
+                const botIds = Array.from(document.getElementById('botSelect').selectedOptions)
+                    .map(option => option.value);
+                const dateFrom = document.getElementById('dateFrom').value;
+                const dateTo = document.getElementById('dateTo').value;
+                
+                // Здесь будет AJAX запрос к вашему API
+                fetch('/analytics/get_stats/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        period: period,
+                        bot_ids: botIds,
+                        date_from: dateFrom,
+                        date_to: dateTo
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    updateUI(data);
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                });
+            }
+            
+            function updateUI(data) {
+                // Обновляем карточки с общей статистикой
+                document.getElementById('totalProfit').textContent = 
+                    `${data.total_profit >= 0 ? '+' : ''}${data.total_profit.toFixed(2)} USDT`;
+                document.getElementById('totalDeals').textContent = data.total_deals;
+                document.getElementById('successRate').textContent = `${data.success_rate.toFixed(1)}%`;
+                
+                // Обновляем круговую диаграмму
+                pnlChart.data.datasets[0].data = [
+                    data.total_profit > 0 ? data.total_profit : 0,
+                    data.total_profit < 0 ? Math.abs(data.total_profit) : 0,
+                    data.total_service_commission
+                ];
+                pnlChart.update();
+                
+                // Обновляем гистограмму
+                profitChart.data.labels = data.profit_timeline.labels;
+                profitChart.data.datasets[0].data = data.profit_timeline.data;
+                profitChart.update();
+                
+                // Обновление таблицы сделок
+                const tbody = document.getElementById('dealsTableBody');
+                tbody.innerHTML = '';
+                
+                if (data.recent_deals.length > 0) {
+                    data.recent_deals.forEach(deal => {
+                        const row = document.createElement('tr');
+                        
+                        row.innerHTML = `
+                            <td>${deal.bot_name}</td>
+                            <td>${deal.trading_pair}</td>
+                            <td>${new Date(deal.created_at).toLocaleDateString()}</td>
+                            <td class="${deal.strategy === 'long' ? 'positive' : 'negative'}">
+                                ${deal.strategy === 'long' ? 'Long' : 'Short'}
+                            </td>
+                            <td>${parseFloat(deal.volume).toFixed(2)}</td>
+                            <td class="${deal.pnl >= 0 ? 'positive' : 'negative'}">
+                                ${deal.pnl >= 0 ? '+' : ''}${parseFloat(deal.pnl).toFixed(2)}
+                            </td>
+                            <td>${parseFloat(deal.service_commission).toFixed(2)}</td>
+                        `;
+                        
+                        tbody.appendChild(row);
+                    });
+                }
+                
+                // Заполняем оставшиеся строки пустыми данными
+                const remainingRows = 10 - Math.min(data.recent_deals.length, 10);
+                for (let i = 0; i < remainingRows; i++) {
+                    const row = document.createElement('tr');
+                    row.innerHTML = '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+                    tbody.appendChild(row);
+                }
+            }
+            
+            // Обработчик кнопки применения фильтров
+            document.getElementById('applyFilters').addEventListener('click', loadAnalyticsData);
+            
+            // Установим текущую дату как конечную для кастомного диапазона
+            document.getElementById('dateTo').valueAsDate = new Date();
+            
+            // Первоначальная загрузка данных
+            loadAnalyticsData();
+        });
+    </script>
+</body>
+</html>

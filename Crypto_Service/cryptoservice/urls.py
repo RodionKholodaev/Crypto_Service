@@ -24,6 +24,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),
+    path('analytics/', include('analytics.urls')),
     path('user/', include('users.urls')),  # Основные маршруты (регистрация, вход, home)
     path('bots/', include('bots.urls')),  # Все маршруты ботов будут начинаться с /bots/
     
