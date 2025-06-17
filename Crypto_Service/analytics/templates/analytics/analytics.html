@@ -31,11 +31,11 @@
                 <div class="custom-date-range" id="customDateRange" style="display: none;">
                     <div class="form-group">
                         <label class="form-label">С:</label>
-                        <input type="date" id="dateFrom" class="form-control">
+                        <input type="date" id="dateFrom" class="form-control" required>
                     </div>
                     <div class="form-group">
                         <label class="form-label">По:</label>
-                        <input type="date" id="dateTo" class="form-control">
+                        <input type="date" id="dateTo" class="form-control" required>
                     </div>
                 </div>
             </div>
@@ -101,12 +101,13 @@
                             <th>Объем (USDT)</th>
                             <th>PnL (USDT)</th>
                             <th>Комиссия сервиса</th>
+                            <th>Комиссия биржи</th>
                         </tr>
                     </thead>
                     <tbody id="dealsTableBody">
-                        <!-- Заполняем 10 строк, даже если данных нет -->
                         {% for i in "x"|rjust:"10" %}
                         <tr>
+                            <td>-</td>
                             <td>-</td>
                             <td>-</td>
                             <td>-</td>
@@ -148,16 +149,18 @@
             const pnlCtx = document.getElementById('pnlDistributionChart').getContext('2d');
             const profitCtx = document.getElementById('profitChart').getContext('2d');
             
+            // Круговая диаграмма
             let pnlChart = new Chart(pnlCtx, {
                 type: 'pie',
                 data: {
-                    labels: ['Прибыль', 'Убыток', 'Комиссия сервиса'],
+                    labels: ['Прибыль', 'Убыток', 'Комиссия сервиса', 'Комиссия биржи'],
                     datasets: [{
-                        data: [0, 0, 0],
+                        data: [1, 1, 1, 1], // Начальные значения для отображения пустого круга
                         backgroundColor: [
-                            '#00b894', // зеленый для прибыли
-                            '#d63031', // красный для убытка
-                            '#6c5ce7'  // фиолетовый для комиссии сервиса
+                            '#00b894',
+                            '#d63031',
+                            '#6c5ce7',
+                            '#fdcb6e'
                         ]
                     }]
                 },
@@ -170,29 +173,57 @@
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    return `${context.label}: ${context.raw.toFixed(2)} USDT`;
+                                    return context.raw === 1 ? 'Нет данных' : `${context.label}: ${context.raw.toFixed(2)} USDT`;
                                 }
                             }
+                        },
+                        emptyPieChart: {
+                            text: 'Нет данных для отображения',
+                            color: '#6c757d',
+                            fontStyle: 'italic'
                         }
                     }
-                }
+                },
+                plugins: [{
+                    id: 'emptyPieChart',
+                    afterDraw(chart) {
+                        const { datasets } = chart.data;
+                        if (datasets[0].data.every(item => item === 1)) {
+                            const { width, height } = chart;
+                            const { ctx } = chart;
+                            
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.font = 'italic 16px Arial';
+                            ctx.fillStyle = chart.options.plugins.emptyPieChart.color;
+                            ctx.fillText(
+                                chart.options.plugins.emptyPieChart.text,
+                                width / 2,
+                                height / 2
+                            );
+                        }
+                    }
+                }]
             });
-            
+
+            // Гистограмма
             let profitChart = new Chart(profitCtx, {
                 type: 'bar',
                 data: {
-                    labels: [],
+                    labels: ['Нет данных'],
                     datasets: [{
                         label: 'Прибыль (USDT)',
-                        data: [],
-                        backgroundColor: '#6c5ce7'
+                        data: [0],
+                        backgroundColor: '#f5f6fa',
+                        borderColor: '#ddd',
+                        borderWidth: 1
                     }]
                 },
                 options: {
                     responsive: true,
                     scales: {
                         y: {
-                            beginAtZero: false,
+                            beginAtZero: true,
                             title: {
                                 display: true,
                                 text: 'USDT'
@@ -207,14 +238,37 @@
                     },
                     plugins: {
                         tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    return `${context.dataset.label}: ${context.raw.toFixed(2)}`;
-                                }
-                            }
+                            enabled: false
+                        },
+                        legend: {
+                            display: false
+                        },
+                        emptyChart: {
+                            text: 'Нет данных для отображения',
+                            color: '#6c757d',
+                            fontStyle: 'italic'
                         }
                     }
-                }
+                },
+                plugins: [{
+                    id: 'emptyChart',
+                    afterDraw(chart) {
+                        if (chart.data.labels.length === 1 && chart.data.labels[0] === 'Нет данных') {
+                            const { width, height } = chart;
+                            const { ctx } = chart;
+                            
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.font = 'italic 16px Arial';
+                            ctx.fillStyle = chart.options.plugins.emptyChart.color;
+                            ctx.fillText(
+                                chart.options.plugins.emptyChart.text,
+                                width / 2,
+                                height / 2
+                            );
+                        }
+                    }
+                }]
             });
             
             // Функция для загрузки данных
@@ -250,61 +304,120 @@
             
             function updateUI(data) {
                 // Обновляем карточки с общей статистикой
-                document.getElementById('totalProfit').textContent = 
-                    `${data.total_profit >= 0 ? '+' : ''}${data.total_profit.toFixed(2)} USDT`;
-                document.getElementById('totalDeals').textContent = data.total_deals;
-                document.getElementById('successRate').textContent = `${data.success_rate.toFixed(1)}%`;
+                const totalProfitElement = document.getElementById('totalProfit');
+                const totalDealsElement = document.getElementById('totalDeals');
+                const successRateElement = document.getElementById('successRate');
                 
-                // Обновляем круговую диаграмму
-                pnlChart.data.datasets[0].data = [
-                    data.total_profit > 0 ? data.total_profit : 0,
-                    data.total_profit < 0 ? Math.abs(data.total_profit) : 0,
-                    data.total_service_commission
-                ];
+                if (data.total_deals > 0) {
+                    totalProfitElement.textContent = `${data.total_profit >= 0 ? '+' : ''}${data.total_profit.toFixed(2)} USDT`;
+                    totalDealsElement.textContent = data.total_deals;
+                    successRateElement.textContent = `${data.success_rate.toFixed(1)}%`;
+                } else {
+                    totalProfitElement.textContent = '0.00 USDT';
+                    totalDealsElement.textContent = '0';
+                    successRateElement.textContent = '0%';
+                }
+
+                // Обновляем круговую диаграмму распределения PnL
+                if (data.total_deals === 0) {
+                    // Режим "нет данных" - показываем пустой круг с сообщением
+                    pnlChart.data.datasets[0].data = [1, 1, 1, 1]; // Равные части для пустого круга
+                    pnlChart.options.plugins.tooltip.enabled = false;
+                } else {
+                    // Нормальный режим с данными
+                    pnlChart.data.datasets[0].data = [
+                        data.total_profit > 0 ? data.total_profit : 0,
+                        data.total_profit < 0 ? Math.abs(data.total_profit) : 0,
+                        data.total_service_commission,
+                        data.total_exchange_commission
+                    ];
+                    pnlChart.options.plugins.tooltip.enabled = true;
+                }
                 pnlChart.update();
-                
-                // Обновляем гистограмму
-                profitChart.data.labels = data.profit_timeline.labels;
-                profitChart.data.datasets[0].data = data.profit_timeline.data;
+
+                // Обновляем гистограмму динамики прибыли
+                if (data.profit_timeline.labels.length === 0) {
+                    // Режим "нет данных" - показываем серую область с сообщением
+                    profitChart.data.labels = ['Нет данных'];
+                    profitChart.data.datasets[0].data = [0];
+                    profitChart.data.datasets[0].backgroundColor = '#f5f6fa';
+                    profitChart.data.datasets[0].borderColor = '#ddd';
+                    profitChart.options.plugins.tooltip.enabled = false;
+                } else {
+                    // Нормальный режим с данными
+                    profitChart.data.labels = data.profit_timeline.labels;
+                    profitChart.data.datasets[0].data = data.profit_timeline.data;
+                    profitChart.data.datasets[0].backgroundColor = '#6c5ce7';
+                    profitChart.data.datasets[0].borderColor = '#6c5ce7';
+                    profitChart.options.plugins.tooltip.enabled = true;
+                }
                 profitChart.update();
-                
+
                 // Обновление таблицы сделок
                 const tbody = document.getElementById('dealsTableBody');
                 tbody.innerHTML = '';
-                
-                if (data.recent_deals.length > 0) {
+
+                if (data.recent_deals && data.recent_deals.length > 0) {
+                    // Заполняем таблицу реальными данными
                     data.recent_deals.forEach(deal => {
                         const row = document.createElement('tr');
                         
                         row.innerHTML = `
-                            <td>${deal.bot_name}</td>
-                            <td>${deal.trading_pair}</td>
-                            <td>${new Date(deal.created_at).toLocaleDateString()}</td>
+                            <td>${deal.bot_name || '-'}</td>
+                            <td>${deal.trading_pair || '-'}</td>
+                            <td>${deal.created_at ? new Date(deal.created_at).toLocaleDateString() : '-'}</td>
                             <td class="${deal.strategy === 'long' ? 'positive' : 'negative'}">
                                 ${deal.strategy === 'long' ? 'Long' : 'Short'}
                             </td>
-                            <td>${parseFloat(deal.volume).toFixed(2)}</td>
+                            <td>${deal.volume ? parseFloat(deal.volume).toFixed(2) : '-'}</td>
                             <td class="${deal.pnl >= 0 ? 'positive' : 'negative'}">
-                                ${deal.pnl >= 0 ? '+' : ''}${parseFloat(deal.pnl).toFixed(2)}
+                                ${deal.pnl ? (deal.pnl >= 0 ? '+' : '') + parseFloat(deal.pnl).toFixed(2) : '-'}
                             </td>
-                            <td>${parseFloat(deal.service_commission).toFixed(2)}</td>
+                            <td>${deal.service_commission ? parseFloat(deal.service_commission).toFixed(2) : '-'}</td>
+                            <td>${deal.exchange_commission ? parseFloat(deal.exchange_commission).toFixed(2) : '-'}</td>
                         `;
                         
                         tbody.appendChild(row);
                     });
-                }
-                
-                // Заполняем оставшиеся строки пустыми данными
-                const remainingRows = 10 - Math.min(data.recent_deals.length, 10);
-                for (let i = 0; i < remainingRows; i++) {
-                    const row = document.createElement('tr');
-                    row.innerHTML = '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
-                    tbody.appendChild(row);
+
+                    // Дополняем до 10 строк, если данных меньше
+                    const remainingRows = 10 - Math.min(data.recent_deals.length, 10);
+                    for (let i = 0; i < remainingRows; i++) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+                        tbody.appendChild(row);
+                    }
+                } else {
+                    // Заполняем 10 пустыми строками, если данных нет
+                    for (let i = 0; i < 10; i++) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = '<td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td>-</td>';
+                        tbody.appendChild(row);
+                    }
                 }
             }
             
             // Обработчик кнопки применения фильтров
-            document.getElementById('applyFilters').addEventListener('click', loadAnalyticsData);
+            document.getElementById('applyFilters').addEventListener('click', function() {
+                const period = periodSelect.value;
+                
+                if (period === 'custom') {
+                    const dateFrom = document.getElementById('dateFrom').value;
+                    const dateTo = document.getElementById('dateTo').value;
+                    
+                    if (!dateFrom || !dateTo) {
+                        alert('Пожалуйста, выберите диапазон дат');
+                        return;
+                    }
+                    
+                    if (new Date(dateFrom) > new Date(dateTo)) {
+                        alert('Дата "С" должна быть раньше даты "По"');
+                        return;
+                    }
+                }
+                
+                loadAnalyticsData();
+            });
             
             // Установим текущую дату как конечную для кастомного диапазона
             document.getElementById('dateTo').valueAsDate = new Date();

@@ -934,3 +934,39 @@ select[multiple] option:hover {
         padding: 8px 10px;
     }
 }
+
+/* Уменьшим padding для компактности таблицы */
+.deals-table th, 
+.deals-table td {
+    padding: 8px 12px;
+}
+
+/* Сделаем некоторые колонки уже */
+.deals-table th:nth-child(4),  /* Направление */
+.deals-table td:nth-child(4),
+.deals-table th:nth-child(6),  /* PnL */
+.deals-table td:nth-child(6),
+.deals-table th:nth-child(7),  /* Комиссия сервиса */
+.deals-table td:nth-child(7),
+.deals-table th:nth-child(8),  /* Комиссия биржи */
+.deals-table td:nth-child(8) {
+    width: 100px;
+}
+
+/* Стили для пустых графиков */
+.chart-container {
+    position: relative;
+}
+
+.chart-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #6c757d;
+    font-style: italic;
+    text-align: center;
+    width: 100%;
+    padding: 0 20px;
+    box-sizing: border-box;
+}

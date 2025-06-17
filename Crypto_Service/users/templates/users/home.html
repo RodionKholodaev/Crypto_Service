@@ -38,7 +38,7 @@
                 <li><a href="{% url 'home' %}"><i class="fas fa-key"></i> Главная</a></li>
                 <li><a href="{% url 'profile' %}"><i class="fas fa-user"></i> Профиль</a></li>
                 <li><a href="{% url 'my_bots' %}"><i class="fas fa-robot"></i> Мои боты</a></li>
-                <li><a href="{% url 'statistics' %}"><i class="fas fa-chart-line"></i> Статистика</a></li>
+                <li><a href="{% url 'analytics' %}"><i class="fas fa-chart-line"></i> Статистика</a></li>
                 <li><a href="#"><i class="fas fa-question-circle"></i> Помощь</a></li>
             </ul>
         </aside>
@@ -58,15 +58,13 @@
                         <i class="fas fa-coins" style="color: var(--warning);"></i>
                     </div>
                     <div class="card-value">{{user.balance}}</div>
-                    <div class="card-label">≈ $1,245.67</div>
                 </div>
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">Активные боты</div>
                         <i class="fas fa-robot" style="color: var(--success);"></i>
                     </div>
-                    <div class="card-value">5</div>
-                    <div class="card-label">из 10 доступных</div>
+                    <div class="card-value">{{ number_of_bots }}</div>
                 </div>
                 <div class="card">
                     <div class="card-header">
@@ -82,18 +80,23 @@
             <div class="balance-cards">
                 <div class="balance-card">
                     <div class="balance-name">Баланс на бирже</div>
-                    <div class="balance-value">1,245.67</div>
-                    <div class="balance-change">≈ $1,245.67</div>
+                    <div class="balance-value">
+                        {% if exchange_balance is not None %}
+                            {{ exchange_balance|floatformat:2 }}
+                        {% elif balance_error %}
+                            Ошибка
+                        {% else %}
+                            N/A
+                        {% endif %}
+                    </div>
                 </div>
                 <div class="balance-card">
                     <div class="balance-name">В управлении ботами</div>
-                    <div class="balance-value">845.21</div>
-                    <div class="balance-change">≈ $845.21</div>
+                    <div class="balance-value">{{ total_bots_deposit|floatformat:2 }}</div>
                 </div>
                 <div class="balance-card">
                     <div class="balance-name">Нереализованный P&L</div>
                     <div class="balance-value positive">+45.32</div>
-                    <div class="balance-change positive">≈ +$45.32 (3.72%)</div>
                 </div>
             </div>
 

@@ -1,87 +1,101 @@
-# analytics/views.py
 from django.shortcuts import render
-from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta
-from users.models import User
-from bots.models import Deal, Bot
 import json
+from bots.models import Deal, Bot
 
-@login_required
-def statistics_view(request):
-    # Получаем всех ботов пользователя для фильтра
-    user_bots = Bot.objects.filter(user=request.user)
-    return render(request, 'analytics/statistics.html', {
-        'user_bots': user_bots
-    })
-
-@login_required
-def get_deals_stats(request):
-    if request.method != 'GET':
-        return JsonResponse({'error': 'Invalid request method'}, status=400)
-    
+@require_POST
+def get_stats(request):
     try:
         data = json.loads(request.body)
-        period_days = int(data.get('period_days', 30))
+        
+        # Получаем параметры фильтрации
+        period = data.get('period', '30')
         bot_ids = data.get('bot_ids', [])
+        date_from = data.get('date_from')
+        date_to = data.get('date_to')
         
-        # Рассчитываем дату начала периода
+        # Определяем период для фильтрации
         end_date = timezone.now()
-        start_date = end_date - timedelta(days=period_days)
+        if period == 'custom' and date_from and date_to:
+            start_date = timezone.datetime.strptime(date_from, '%Y-%m-%d')
+            end_date = timezone.datetime.strptime(date_to, '%Y-%m-%d')
+        else:
+            days = int(period)
+            start_date = end_date - timedelta(days=days)
         
-        # Фильтруем сделки по пользователю, периоду и завершенным сделкам
+        # Фильтруем сделки
         deals = Deal.objects.filter(
-            bot__user=request.user,
             created_at__range=(start_date, end_date),
-            is_active=False
+            is_active=False,  # Только закрытые сделки
+            is_filled=True    # Только исполненные ордера
         )
         
-        # Дополнительная фильтрация по ботам, если выбраны конкретные
-        if 'all' not in bot_ids:
+        if bot_ids:
             deals = deals.filter(bot_id__in=bot_ids)
         
-        # Рассчитываем статистику
+        # Общая статистика
         total_deals = deals.count()
-        profitable = deals.filter(pnl__gt=0).count()
-        unprofitable = deals.filter(pnl__lt=0).count()
+        total_profit = deals.aggregate(sum=Sum('pnl'))['sum'] or 0
+        total_service_commission = deals.aggregate(sum=Sum('service_commission'))['sum'] or 0
+        total_exchange_commission = deals.aggregate(sum=Sum('exchange_commission'))['sum'] or 0
         
-        total_pnl = sum(deal.pnl for deal in deals)
-        exchange_commission = sum(deal.exchange_commission for deal in deals)
-        service_commission = sum(deal.service_commission for deal in deals)
+        # Процент успешных сделок
+        successful_deals = deals.filter(pnl__gt=0).count()
+        success_rate = (successful_deals / total_deals * 100) if total_deals > 0 else 0
         
-        # Группируем данные по дням для гистограммы
-        daily_data = deals.extra({
-            'day': "DATE(created_at)"
-        }).values('day').annotate(
-            daily_pnl=Sum('pnl'),
-            daily_commission=Sum('exchange_commission') + Sum('service_commission')
-        ).order_by('day')
+        # Динамика прибыли по дням
+        profit_timeline = deals.values('created_at__date').annotate(
+            daily_profit=Sum('pnl')
+        ).order_by('created_at__date')
         
-        # Формируем данные для графиков
-        pie_data = [
-            max(0, float(total_pnl)),    # Прибыль
-            abs(min(0, float(total_pnl))), # Убыток
-            float(exchange_commission),    # Комиссия биржи
-            float(service_commission)      # Комиссия сервиса
+        timeline_labels = [item['created_at__date'].strftime('%d.%m.%Y') for item in profit_timeline]
+        timeline_data = [float(item['daily_profit']) for item in profit_timeline]
+        
+        # Последние 10 сделок
+        recent_deals = deals.select_related('bot').order_by('-created_at')[:10]
+        recent_deals_data = [
+            {
+                'bot_name': deal.bot.name,
+                'trading_pair': deal.trading_pair,
+                'created_at': deal.created_at.isoformat(),
+                'strategy': 'long' if deal.bot.strategy else 'short',
+                'volume': float(deal.volume),
+                'pnl': float(deal.pnl),
+                'service_commission': float(deal.service_commission),
+                'exchange_commission': float(deal.exchange_commission)
+            }
+            for deal in recent_deals
         ]
         
-        bar_labels = [entry['day'].strftime('%Y-%m-%d') for entry in daily_data]
-        bar_data = [float(entry['daily_pnl'] - entry['daily_commission']) for entry in daily_data]
-        
-        response_data = {
-            'totalDeals': total_deals,
-            'profitable': profitable,
-            'unprofitable': unprofitable,
-            'totalPnl': float(total_pnl),
-            'exchangeCommission': float(exchange_commission),
-            'serviceCommission': float(service_commission),
-            'pieData': pie_data,
-            'barLabels': bar_labels,
-            'barData': bar_data
-        }
-        
-        return JsonResponse(response_data)
+        return JsonResponse({
+            'status': 'success',
+            'data': {
+                'total_profit': float(total_profit),
+                'total_deals': total_deals,
+                'success_rate': float(success_rate),
+                'total_service_commission': float(total_service_commission),
+                'total_exchange_commission': float(total_exchange_commission),
+                'profit_timeline': {
+                    'labels': timeline_labels,
+                    'data': timeline_data
+                },
+                'recent_deals': recent_deals_data
+            }
+        })
     
     except Exception as e:
-        return JsonResponse({'error': str(e)}, status=500)
+        return JsonResponse({
+            'status': 'error',
+            'message': str(e)
+        }, status=400)
+
+def analytics_view(request):
+    # Получаем всех ботов пользователя для фильтра
+    user_bots = Bot.objects.filter(user=request.user).only('id', 'name')
+    return render(request, 'analytics/analytics.html', {
+        'user_bots': user_bots
+    })

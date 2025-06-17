@@ -3,7 +3,7 @@ from django.contrib.auth import authenticate, login
 from .forms import RegisterForm, ProfileForm
 from django.contrib import messages
 
-from bots.models import ExchangeAccount
+from bots.models import ExchangeAccount, Bot
 from .forms import ExchangeAccountForm, EditExchangeAccountForm
 
 from .forms import PasswordResetRequestForm, PasswordResetVerifyForm
@@ -15,6 +15,8 @@ from .forms import SetNewPasswordForm
 from .models import User
 from .forms import EmailConfirmationForm
 from .models import EmailConfirmationCode
+
+import ccxt
 
 
 def register_view(request):
@@ -107,7 +109,50 @@ def login_view(request):
 
 def home_view(request):
     user = request.user
+    exchange_balance = None
+    error_message = None
+    total_bots_deposit=0
+    number_of_bots=0
+
+
+    # Получаем первый активный API ключ пользователя для Bybit
+    api_key = ExchangeAccount.objects.filter(
+        user=user, 
+        exchange='bybit', 
+        is_active=True
+    ).first()
     
+    # Вычисляем сумму депозитов всех ботов пользователя
+    bots = Bot.objects.filter(user=user, is_active=True)
+    total_bots_deposit = sum(bot.deposit for bot in bots)
+
+    number_of_bots=len(bots)
+
+    if api_key:
+        try:
+            # Инициализируем подключение к бирже
+            exchange = ccxt.bybit({
+                'apiKey': api_key.api_key,
+                'secret': api_key.api_secret,
+                'options': {
+                    'defaultType': 'unified',
+                },
+                'enableRateLimit': True,  # Включаем rate-limiting
+            })
+            
+            # Получаем баланс
+            balance = exchange.fetch_balance()
+            exchange_balance = balance['total'].get('USDT', 0)
+            
+        except ccxt.AuthenticationError:
+            error_message = "Ошибка аутентификации API ключа"
+        except ccxt.NetworkError:
+            error_message = "Ошибка соединения с биржей"
+        except Exception as e:
+            error_message = "Что-то пошло не так"
+            print(f"Ошибка получения баланса: {e}")  # Логируем для дебага
+
+
     if request.method == 'POST':
         if 'delete_key' in request.POST:
             # Удаление ключа (оставляем без изменений)
@@ -154,6 +199,10 @@ def home_view(request):
         'form': form,
         'edit_form': edit_form,
         'api_keys': api_keys,
+        'exchange_balance': exchange_balance,
+        'balance_error': error_message,
+        'total_bots_deposit': total_bots_deposit,  # Добавляем в контекст
+        'number_of_bots': number_of_bots,
     })
 
 def profile(request):
