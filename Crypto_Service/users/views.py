@@ -111,6 +111,8 @@ def login_view(request):
 
 
 def home_view(request):
+    # request экземпляр класса HttpRequest 
+    # request.user хранит данные пользователя в запросе
     user = request.user
     exchange_balance = None
     error_message = None
@@ -138,17 +140,27 @@ def home_view(request):
                 'enableRateLimit': True,
             })
 
-            # Запрашиваем текущие позиции
-            positions = exchange.fetch_positions()
+            # Запрашиваем текущие позиции и баланс
+            balance, positions = exchange.fetch_balance(), exchange.fetch_positions()
             
             # Суммируем нереализованный PnL для всех открытых позиций
             for pos in positions:
                 if float(pos['contracts']) > 0:  # Только открытые позиции
                     unrealized_pnl += float(pos['unrealisedPnl'])
 
+                     
+            
+            # Получаем баланс
+            exchange_balance = balance['total'].get('USDT', 0)
+            
+        except ccxt.AuthenticationError:
+            error_message = "Ошибка аутентификации API ключа"
+        except ccxt.NetworkError:
+            error_message = "Ошибка соединения с биржей"
         except Exception as e:
-            pnl_error = f"Ошибка: {str(e)}"
-            print(f"API Bybit error: {e}")  # Логируем для дебага
+            error_message = "Что-то пошло не так"
+            print(f"Ошибка: {e}")  # Логируем для дебага
+
 
 
     # Вычисляем сумму депозитов всех ботов пользователя
@@ -166,6 +178,7 @@ def home_view(request):
         bot__user=user,
         is_active=False,
         is_filled=True,
+        # __gte - фишка django (created_at<last_week)
         created_at__gte=last_week
     )
 
@@ -176,31 +189,6 @@ def home_view(request):
     if total_bots_deposit > 0:
         weekly_profit_percent = (total_pnl / total_bots_deposit) * 100
 
-
-
-    if api_key:
-        try:
-            # Инициализируем подключение к бирже
-            exchange = ccxt.bybit({
-                'apiKey': api_key.api_key,
-                'secret': api_key.api_secret,
-                'options': {
-                    'defaultType': 'unified',
-                },
-                'enableRateLimit': True,  # Включаем rate-limiting
-            })
-            
-            # Получаем баланс
-            balance = exchange.fetch_balance()
-            exchange_balance = balance['total'].get('USDT', 0)
-            
-        except ccxt.AuthenticationError:
-            error_message = "Ошибка аутентификации API ключа"
-        except ccxt.NetworkError:
-            error_message = "Ошибка соединения с биржей"
-        except Exception as e:
-            error_message = "Что-то пошло не так"
-            print(f"Ошибка получения баланса: {e}")  # Логируем для дебага
 
 
     if request.method == 'POST':
