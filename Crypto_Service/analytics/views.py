@@ -1,101 +1,88 @@
 from django.shortcuts import render
-from django.http import JsonResponse
-from django.views.decorators.http import require_POST
-from django.db.models import Sum, Count, Q
+from django.core.paginator import Paginator
+from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
 from datetime import timedelta
-import json
 from bots.models import Deal, Bot
+from django.db.models.functions import TruncDay
 
-@require_POST
-def get_stats(request):
-    try:
-        data = json.loads(request.body)
-        
-        # Получаем параметры фильтрации
-        period = data.get('period', '30')
-        bot_ids = data.get('bot_ids', [])
-        date_from = data.get('date_from')
-        date_to = data.get('date_to')
-        
-        # Определяем период для фильтрации
-        end_date = timezone.now()
-        if period == 'custom' and date_from and date_to:
-            start_date = timezone.datetime.strptime(date_from, '%Y-%m-%d')
-            end_date = timezone.datetime.strptime(date_to, '%Y-%m-%d')
-        else:
-            days = int(period)
-            start_date = end_date - timedelta(days=days)
-        
-        # Фильтруем сделки
-        deals = Deal.objects.filter(
-            created_at__range=(start_date, end_date),
-            is_active=False,  # Только закрытые сделки
-            is_filled=True    # Только исполненные ордера
-        )
-        
-        if bot_ids:
-            deals = deals.filter(bot_id__in=bot_ids)
-        
-        # Общая статистика
-        total_deals = deals.count()
-        total_profit = deals.aggregate(sum=Sum('pnl'))['sum'] or 0
-        total_service_commission = deals.aggregate(sum=Sum('service_commission'))['sum'] or 0
-        total_exchange_commission = deals.aggregate(sum=Sum('exchange_commission'))['sum'] or 0
-        
-        # Процент успешных сделок
-        successful_deals = deals.filter(pnl__gt=0).count()
-        success_rate = (successful_deals / total_deals * 100) if total_deals > 0 else 0
-        
-        # Динамика прибыли по дням
-        profit_timeline = deals.values('created_at__date').annotate(
-            daily_profit=Sum('pnl')
-        ).order_by('created_at__date')
-        
-        timeline_labels = [item['created_at__date'].strftime('%d.%m.%Y') for item in profit_timeline]
-        timeline_data = [float(item['daily_profit']) for item in profit_timeline]
-        
-        # Последние 10 сделок
-        recent_deals = deals.select_related('bot').order_by('-created_at')[:10]
-        recent_deals_data = [
-            {
-                'bot_name': deal.bot.name,
-                'trading_pair': deal.trading_pair,
-                'created_at': deal.created_at.isoformat(),
-                'strategy': 'long' if deal.bot.strategy else 'short',
-                'volume': float(deal.volume),
-                'pnl': float(deal.pnl),
-                'service_commission': float(deal.service_commission),
-                'exchange_commission': float(deal.exchange_commission)
-            }
-            for deal in recent_deals
-        ]
-        
-        return JsonResponse({
-            'status': 'success',
-            'data': {
-                'total_profit': float(total_profit),
-                'total_deals': total_deals,
-                'success_rate': float(success_rate),
-                'total_service_commission': float(total_service_commission),
-                'total_exchange_commission': float(total_exchange_commission),
-                'profit_timeline': {
-                    'labels': timeline_labels,
-                    'data': timeline_data
-                },
-                'recent_deals': recent_deals_data
-            }
-        })
-    
-    except Exception as e:
-        return JsonResponse({
-            'status': 'error',
-            'message': str(e)
-        }, status=400)
+def dashboard_view(request):
+    # Фильтрация сделок (только закрытые и исполненные)
+    deals = Deal.objects.filter(
+        is_active=False,
+        is_filled=True,
+        bot__user=request.user  # Только сделки текущего пользователя
+    ).select_related('bot')
 
-def analytics_view(request):
-    # Получаем всех ботов пользователя для фильтра
-    user_bots = Bot.objects.filter(user=request.user).only('id', 'name')
-    return render(request, 'analytics/analytics.html', {
-        'user_bots': user_bots
-    })
+    # 1. Фильтр по времени
+    time_period = request.GET.get('time_period', 'week')
+    now = timezone.now()
+
+    if time_period == 'today':
+        start_date = now.replace(hour=0, minute=0, second=0)
+        deals = deals.filter(created_at__gte=start_date)
+    elif time_period == 'week':
+        start_date = now - timedelta(days=7)
+        deals = deals.filter(created_at__gte=start_date)
+    elif time_period == 'month':
+        start_date = now - timedelta(days=30)
+        deals = deals.filter(created_at__gte=start_date)
+    elif time_period == 'custom':
+        date_from = request.GET.get('date_from')
+        date_to = request.GET.get('date_to')
+        if date_from and date_to:
+            deals = deals.filter(created_at__range=[date_from, date_to])
+
+    # 2. Фильтр по ботам (если выбран)
+    bot_filter = request.GET.get('bot_filter')
+    if bot_filter and bot_filter != 'all':
+        deals = deals.filter(bot_id=bot_filter)
+
+    # 3. Основные метрики
+    total_profit = deals.aggregate(Sum('pnl'))['pnl__sum'] or 0
+    total_deposit = Bot.objects.filter(user=request.user).aggregate(Sum('deposit'))['deposit__sum'] or 1
+    profit_percent = (total_profit / total_deposit) * 100
+
+    total_deals = deals.count()
+    win_deals = deals.filter(pnl__gt=0).count()
+    win_rate = (win_deals / total_deals * 100) if total_deals > 0 else 0
+    avg_profit_per_deal = total_profit / total_deals if total_deals > 0 else 0
+
+    # 4. Данные для гистограммы (прибыль по дням)
+    daily_profit = (
+        deals.annotate(date=TruncDay('created_at'))
+        .values('date')
+        .annotate(profit=Sum('pnl'))
+        .order_by('date')
+    )
+
+    # 5. Данные для круговой диаграммы (распределение PnL)
+    profit_loss_data = {
+        'profit': deals.filter(pnl__gt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0,
+        'loss': abs(deals.filter(pnl__lt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0),
+        'commission': deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0,
+    }
+
+    # 6. Таблица сделок (с пагинацией)
+    paginator = Paginator(deals.order_by('-created_at'), 20)
+    page_number = request.GET.get('page')
+    deals_page = paginator.get_page(page_number)
+
+    # 7. Списки для фильтров
+    user_bots = Bot.objects.filter(user=request.user)
+    trading_pairs = deals.values_list('trading_pair', flat=True).distinct()
+
+    context = {
+        'deals': deals_page,
+        'total_profit': total_profit,
+        'profit_percent': profit_percent,
+        'total_deals': total_deals,
+        'win_rate': win_rate,
+        'avg_profit_per_deal': avg_profit_per_deal,
+        'daily_profit': list(daily_profit),
+        'profit_loss_data': profit_loss_data,
+        'user_bots': user_bots,
+        'trading_pairs': trading_pairs,
+        'time_period': time_period,
+    }
+    return render(request, 'analytics/dashboard.html', context)

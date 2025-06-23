@@ -122,18 +122,31 @@
                     <i class="fas fa-wallet" style="color: var(--success);"></i>
                 </div>
                 <div class="payment-form">
+
+
                     <div class="network-selector">
                         <select id="networkSelect">
                             <option value="" disabled selected>Выберите сеть</option>
                             <option value="TRC20">TRON (TRC20)</option>
-                            <option value="BEP20">BNB Smart Chain (BEP20)</option>
-                            <option value="POLYGON">Polygon PoS</option>
                             <option value="ERC20">Ethereum (ERC20)</option>
                         </select>
                     </div>
                     <button class="show-details-btn">
                         <i class="fas fa-qrcode"></i> Показать реквизиты
                     </button>
+                </div>
+                <div id="walletDetails" style="display: none; margin-top: 20px;">
+                    <div class="wallet-card">
+                        <div class="wallet-info">
+                            <div class="wallet-address" id="walletAddress"></div>
+                            <button class="btn btn-outline copy-address-btn" id="copyAddressBtn">
+                                <i class="fas fa-copy"></i> Копировать
+                            </button>
+                        </div>
+                        <div class="wallet-note">
+                            Отправляйте средства только по указанному адресу в выбранной сети
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -260,6 +273,7 @@
             // Здесь можно добавить логику для отображения соответствующих реквизитов
         });
 
+   
         // Обработчик кнопки "Показать реквизиты"
         document.querySelector('.show-details-btn').addEventListener('click', function() {
             const selectedNetwork = document.getElementById('networkSelect').value;
@@ -267,8 +281,37 @@
                 alert('Пожалуйста, выберите сеть для пополнения');
                 return;
             }
-            console.log('Запрос реквизитов для сети:', selectedNetwork);
-            // Здесь можно добавить логику отображения реквизитов
+            
+            const walletDetails = document.getElementById('walletDetails');
+            const walletAddress = document.getElementById('walletAddress');
+            
+            // Устанавливаем адрес в зависимости от выбранной сети
+            if (selectedNetwork === 'TRC20') {
+                walletAddress.textContent = 'TNHCwXJiyUQBz6HhKP2Jg6Ya9rWma6Ucsp';
+            } else if (selectedNetwork === 'ERC20') {
+                walletAddress.textContent = '0xf828889B764407B291b7Ce35Cf84ab216eae7622';
+            }
+            
+            // Показываем блок с адресом
+            walletDetails.style.display = 'block';
+        });
+
+        // Обработчик кнопки копирования адреса
+        document.getElementById('copyAddressBtn')?.addEventListener('click', function() {
+            const walletAddress = document.getElementById('walletAddress').textContent;
+            if (walletAddress) {
+                navigator.clipboard.writeText(walletAddress).then(function() {
+                    // Временное изменение иконки для подтверждения копирования
+                    const icon = this.querySelector('i');
+                    icon.classList.remove('fa-copy');
+                    icon.classList.add('fa-check');
+                    
+                    setTimeout(() => {
+                        icon.classList.remove('fa-check');
+                        icon.classList.add('fa-copy');
+                    }, 2000);
+                }.bind(this));
+            }
         });
         
         // Обработчик для переключения видимости API Secret
@@ -278,6 +321,26 @@
             input.setAttribute('type', type);
             this.classList.toggle('fa-eye');
             this.classList.toggle('fa-eye-slash');
+        });
+        document.getElementById('copyAddressBtn')?.addEventListener('click', function() {
+            const walletAddress = document.getElementById('walletAddress').textContent;
+            if (walletAddress) {
+                navigator.clipboard.writeText(walletAddress).then(function() {
+                    const icon = this.querySelector('i');
+                    const originalText = this.innerHTML;
+                    
+                    // Временное изменение вида кнопки
+                    this.innerHTML = '<i class="fas fa-check"></i> Скопировано';
+                    this.classList.remove('btn-outline');
+                    this.classList.add('btn-success');
+                    
+                    setTimeout(() => {
+                        this.innerHTML = originalText;
+                        this.classList.add('btn-outline');
+                        this.classList.remove('btn-success');
+                    }, 2000);
+                }.bind(this));
+            }
         });
     </script>
 </body>

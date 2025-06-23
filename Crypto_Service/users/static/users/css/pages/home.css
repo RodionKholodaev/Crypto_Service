@@ -209,3 +209,53 @@
     font-size: 18px;
     z-index: 2;
 }
+
+/* Wallet Card */
+.wallet-card {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+}
+
+.wallet-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.wallet-address {
+    flex: 1;
+    font-family: monospace;
+    word-break: break-all;
+    font-size: 14px;
+    padding: 10px 15px;
+    background-color: var(--bg-color);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+}
+
+.copy-address-btn {
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    height: 40px;
+    padding: 0 15px;
+}
+
+.wallet-note {
+    font-size: 13px;
+    color: var(--muted-color);
+    text-align: center;
+    padding-top: 10px;
+    border-top: 1px dashed var(--border-color);
+    margin-top: 15px;
+}
+
+
