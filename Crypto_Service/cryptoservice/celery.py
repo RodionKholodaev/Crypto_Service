@@ -1,6 +1,7 @@
 import os
 from celery import Celery
 import logging
+from celery.schedules import crontab
 # устанавливаем переменную окружения (говорим celery где брать настройки django)
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'cryptoservice.settings')
 # создаем объект класса celery  с именем cryptoservice
@@ -23,5 +24,10 @@ def debug_task(self):
 
 
 # этот файл нужен для интеграции celery в django
-
-
+# возможно при отправке на сервер можно будет сделать иначе
+app.conf.beat_schedule = {
+    'clean_old_transactions': {
+        'task': 'your_app.tasks.clean_old_transactions',
+        'schedule': crontab(minute='*/30'),  # Каждые 30 минут
+    },
+}

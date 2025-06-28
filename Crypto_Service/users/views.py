@@ -28,6 +28,8 @@ from tronpy.keys import PrivateKey
 from web3 import Web3
 from django.conf import settings
 
+from bots.tasks import check_payments
+
 
 def register_view(request):
     if request.method == 'POST': # отправляется когда пользователь отправляет форму
@@ -140,7 +142,8 @@ def generate_crypto_address(user_id: int, network: str) -> str:
             .ChildKey(user_id)
         )
         private_key = PrivateKey(key.PrivateKey())
-        return private_key.public_key.to_base58check_address()
+        tron_address = private_key.public_key.to_base58check_address()
+        return tron_address
 
     elif network == "ERC20":
         # Ethereum: m/44'/60'/0'/0/{user_id}
@@ -153,7 +156,8 @@ def generate_crypto_address(user_id: int, network: str) -> str:
             .ChildKey(user_id)
         )
         public_key = key.PublicKey()
-        return Web3.to_checksum_address(Web3.keccak(public_key[1:])[-20:].hex())
+        eth_address = Web3.to_checksum_address(Web3.keccak(public_key[1:])[-20:].hex())
+        return eth_address
     return "ошибка при получении сети"
     raise ValueError("Неподдерживаемая сеть")
 
@@ -279,6 +283,17 @@ def home_view(request):
                 new_key.save()
                 messages.success(request, 'Ключ успешно добавлен')
                 return redirect('home')
+            
+        
+        if 'payment_completed' in request.POST:
+            network = request.POST.get('network')
+            check_payments.delay()
+            messages.success(
+                request,
+                f"Платеж в сети {network} принят в обработку. "
+                "Баланс будет обновлен после проверки транзакции."
+            )
+
     
     # Для GET-запросов
     form = ExchangeAccountForm()  # Форма для создания ключа
@@ -286,6 +301,15 @@ def home_view(request):
     
     api_keys = ExchangeAccount.objects.filter(user=user)
     
+
+    if request.user.trc20_address is None or request.user.trc20_address=="":
+        request.user.trc20_address=generate_crypto_address(request.user.id, "TRC20")
+        request.user.save()
+
+    if request.user.erc20_address is None or request.user.erc20_address=="":
+        request.user.erc20_address=generate_crypto_address(request.user.id, "ERC20")
+        request.user.save()
+
     return render(request, 'users/home.html', {
         'user': user,
         'form': form,
@@ -293,14 +317,14 @@ def home_view(request):
         'api_keys': api_keys,
         'exchange_balance': exchange_balance,
         'balance_error': error_message,
-        'total_bots_deposit': total_bots_deposit,  # Добавляем в контекст
+        'total_bots_deposit': total_bots_deposit,  
         'number_of_bots': number_of_bots,
         'weekly_profit_percent': weekly_profit_percent,
         'weekly_profit_absolute': total_pnl,
         'unrealized_pnl': unrealized_pnl,
         'pnl_error': pnl_error,
-        'trc20_address': generate_crypto_address(request.user.id, "TRC20"),
-        'erc20_address': generate_crypto_address(request.user.id, "ERC20"),
+        'trc20_address': request.user.trc20_address,
+        'erc20_address': request.user.erc20_address,
     })
 
 def profile(request):

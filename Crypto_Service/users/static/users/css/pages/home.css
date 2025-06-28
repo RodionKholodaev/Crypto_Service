@@ -258,4 +258,6 @@
     margin-top: 15px;
 }
 
-
+.show-details-btn i {
+    margin-right: 8px;
+}

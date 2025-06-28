@@ -1,6 +1,7 @@
 from django.db import models
 from users.models import User
 from encrypted_model_fields.fields import EncryptedCharField
+from django.utils import timezone
 
 # модель для хранения api ключей
 class ExchangeAccount(models.Model):
@@ -106,3 +107,25 @@ class Deal(models.Model):
     is_filled = models.BooleanField(default=False) # для лимитных ордеров
 
 
+
+class CryptoTransaction(models.Model):
+    # выбор для сети
+    NETWORK_CHOICES = [
+        ('TRC20', 'TRON (TRC20)'),
+        ('ERC20', 'Ethereum (ERC20)'),
+    ]
+
+    tx_hash = models.CharField(max_length=100, unique=True)  # Хеш транзакции
+    network = models.CharField(max_length=10, choices=NETWORK_CHOICES)
+    user = models.ForeignKey(User, on_delete=models.CASCADE) # связь с пользователем
+    amount = models.DecimalField(max_digits=20, decimal_places=6)  # Сумма USDT
+    timestamp = models.DateTimeField()  # Время транзакции в блокчейне
+    processed_at = models.DateTimeField(auto_now_add=True)  # Когда обработано у нас
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['tx_hash', 'network']),  # Для быстрого поиска
+        ]
+
+    def __str__(self):
+        return f"{self.network}: {self.tx_hash}"

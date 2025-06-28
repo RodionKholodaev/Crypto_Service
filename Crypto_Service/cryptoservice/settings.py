@@ -214,7 +214,7 @@ CELERY_TASK_ROUTES = {
 CELERY_BEAT_SCHEDULE = {
     'check-trc20-erc20-transactions': {
         'task': 'bots.tasks.check_payments', # Путь к задаче
-        'schedule': 300.0,  # Каждые 5 минут
+        'schedule': 600.0,  # Каждые 10 минут
         'options': {'queue': 'payments'}, # Очередь для задачи
     },
 }
@@ -225,3 +225,5 @@ ADMIN_EMAIL = 'kholodaev10e@mail.ru'
 
 CRYPTO_SEED=os.getenv('CRYPTO_SEED').strip("'\"")
 
+TRONSCAN_API_KEY = os.getenv('TRON_API_KEY')
+ETHERSCAN_API_KEY = os.getenv('ETHERSCAN_API_KEY')
