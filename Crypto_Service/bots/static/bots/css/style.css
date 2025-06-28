@@ -635,7 +635,7 @@ input:checked + .slider:before {
 
 /* Сортировка */
 .sort-dropdown {
-    margin-right: 15px;
+    margin-right: 0;
 }
 
 .sort-dropdown select {
@@ -723,10 +723,18 @@ input:checked + .slider:before {
     background: rgba(108, 92, 231, 0.1);
 }
 
+
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-left: auto; /* Прижимает кнопку и селект к правому краю */
+}
+
 /* Адаптивность */
 @media (max-width: 768px) {
     .header-actions {
-        flex-direction: column;
+        flex-direction: column; 
         gap: 10px;
     }
     

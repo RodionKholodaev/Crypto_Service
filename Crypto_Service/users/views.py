@@ -217,7 +217,7 @@ def home_view(request):
             error_message = "Ошибка соединения с биржей"
         except Exception as e:
             error_message = "Что-то пошло не так"
-            print(f"Ошибка: {e}")  # Логируем для дебага
+            print(f"Ошибка: {e}")  
 
 
 

@@ -68,18 +68,18 @@
                         <div class="deal-stats">
                             <div class="stat-item">
                                 <span class="stat-label">Сделок:</span>
-                                <span class="stat-value">{{ bot.deals.count }}</span>
+                                <span class="stat-value">{{ bot.deals_count|default:0 }}</span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">Прибыль:</span>
-                                <span class="stat-value {% if bot.total_pnl >= 0 %}positive{% else %}negative{% endif %}">
-                                    {{ bot.total_pnl|floatformat:2 }} USDT
+                                <span class="stat-value {% if bot.net_profit >= 0 %}positive{% else %}negative{% endif %}">
+                                    {{ bot.net_profit|default:0|floatformat:2 }} USDT
                                 </span>
                             </div>
                             <div class="stat-item">
                                 <span class="stat-label">ROI:</span>
                                 <span class="stat-value {% if bot.roi >= 0 %}positive{% else %}negative{% endif %}">
-                                    {{ bot.roi|floatformat:2 }}%
+                                    {{ bot.roi|default:0|floatformat:2 }}%
                                 </span>
                             </div>
                         </div>

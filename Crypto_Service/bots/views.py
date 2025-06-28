@@ -5,11 +5,13 @@ from .models import Bot, ExchangeAccount, Indicator
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
 from django.http import JsonResponse
-from django.db.models import Sum, F
+from django.db.models import Sum, F, Count, Q
 import json
 from .tasks import run_trading_bot
 from .statistics import generate_pnl_chart
 from celery import current_app
+
+
 
 @login_required
 def create_bot(request):
@@ -68,13 +70,69 @@ def edit_bot(request, bot_id):
         'bot_id': bot_id
     })
 
+# @login_required
+# def my_bots(request):
+#     bots = Bot.objects.filter(user=request.user).annotate(
+#         total_pnl=Sum('deals__pnl'),
+#         roi=(Sum('deals__pnl') / F('deposit')) * 100
+#     )
+    
+#     sort_by = request.GET.get('sort', 'name_asc')
+#     if sort_by == 'name_desc':
+#         bots = bots.order_by('-name')
+#     elif sort_by == 'active':
+#         bots = bots.order_by('-is_active', 'name')
+#     elif sort_by == 'inactive':
+#         bots = bots.order_by('is_active', 'name')
+#     elif sort_by == 'profit':
+#         bots = bots.order_by('-total_pnl')
+#     else:
+#         bots = bots.order_by('name')
+    
+#     paginator = Paginator(bots, 9)
+#     page_number = request.GET.get('page')
+#     page_obj = paginator.get_page(page_number)
+    
+#     return render(request, 'bots/my_bots.html', {'bots': page_obj})
+
+
 @login_required
 def my_bots(request):
+    # Получаем ботов пользователя с аннотациями для статистики
     bots = Bot.objects.filter(user=request.user).annotate(
-        total_pnl=Sum('deals__pnl'),
-        roi=(Sum('deals__pnl') / F('deposit')) * 100
+        # Количество завершенных сделок (не активных и заполненных)
+        deals_count=Count(
+            'deals',
+            filter=Q(deals__is_active=False) & Q(deals__is_filled=True)
+        ),
+        # Суммарный PNL по завершенным сделкам
+        total_pnl=Sum(
+            'deals__pnl',
+            filter=Q(deals__is_active=False) & Q(deals__is_filled=True)
+        ),
+        # Суммарные комиссии по завершенным сделкам
+        total_exchange_commission=Sum(
+            'deals__exchange_commission',
+            filter=Q(deals__is_active=False) & Q(deals__is_filled=True)
+        ),
+        total_service_commission=Sum(
+            'deals__service_commission',
+            filter=Q(deals__is_active=False) & Q(deals__is_filled=True)
+        )
     )
     
+    # Добавляем вычисление чистой прибыли и ROI для каждого бота
+    for bot in bots:
+        # Чистая прибыль = PNL - комиссии
+        bot.net_profit = (bot.total_pnl or 0) - (bot.total_exchange_commission or 0) - (bot.total_service_commission or 0)
+        
+        # ROI = (Чистая прибыль / Депозит) * 100
+        if bot.deposit > 0:
+            bot.roi = (bot.net_profit / bot.deposit) * 100
+        else:
+            bot.roi = 0
+    
+    # Сортировка
     sort_by = request.GET.get('sort', 'name_asc')
     if sort_by == 'name_desc':
         bots = bots.order_by('-name')
@@ -83,10 +141,11 @@ def my_bots(request):
     elif sort_by == 'inactive':
         bots = bots.order_by('is_active', 'name')
     elif sort_by == 'profit':
-        bots = bots.order_by('-total_pnl')
+        bots = bots.order_by('-net_profit')
     else:
         bots = bots.order_by('name')
     
+    # Пагинация
     paginator = Paginator(bots, 9)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
