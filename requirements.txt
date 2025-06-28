@@ -19,3 +19,8 @@ asgiref>=3.3.2
 
 ccxt
 
+django-celery-results
+mnemonic
+bip32utils
+tronpy
+web3

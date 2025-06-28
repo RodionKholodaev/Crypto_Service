@@ -60,7 +60,7 @@ class TradingBot:
                 'enableUnifiedAccount': True,  # Для USDT-фьючерсов
                 'timeout': 30000, # почему-то не получается свзяваться с bybit (увеличил timeout для проверки)
             })
-            # Устанавливаем тестовую сеть (отключено для реальной торговли)
+            # Устанавливаем реальную сеть 
             self.client.set_sandbox_mode(False)
             await self.client.load_markets()
             logger.info(f"Клиент CCXT для {exchange_name} инициализирован")
@@ -626,6 +626,17 @@ class TradingBot:
                 is_active = await sync_to_async(lambda: self.bot.is_active)()
                 bot_name = await sync_to_async(lambda: self.bot.name)()
                 trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+
+                # Проверяем баланс пользователя
+                user = await sync_to_async(lambda: self.bot.user)()
+                balance = await sync_to_async(lambda: user.balance)()
+
+                if balance<=0:
+                    logger.info("Недостаточно баланса! Бот остановлен.")
+                    self.bot.is_active = False
+                    self.running=False
+                    await sync_to_async(self.bot.save)()
+                    break
 
                 logger.info(f"получены данные из бд {is_active}, {bot_name}, {trading_pair}")
 

@@ -25,6 +25,7 @@ def create_bot(request):
             formset.save()
             
             if bot.is_active:
+                # через apply_async мы кладем задачу в очередь в redis, воркеры забирают задачу из очереди и выполняют ее
                 run_trading_bot.apply_async(args=[bot.id], task_id=f"run_trading_bot_{bot.id}")
             
             return redirect('home')

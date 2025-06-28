@@ -22,6 +22,13 @@ from django.utils import timezone
 from datetime import timedelta
 
 
+from mnemonic import Mnemonic
+from bip32utils import BIP32Key, BIP32_HARDEN
+from tronpy.keys import PrivateKey
+from web3 import Web3
+from django.conf import settings
+
+
 def register_view(request):
     if request.method == 'POST': # отправляется когда пользователь отправляет форму
         form = RegisterForm(request.POST)
@@ -105,9 +112,56 @@ def login_view(request):
     return render(request, 'users/login.html', {'messages': messages.get_messages(request)})
 
 
-# def home_view(request):
-#     user=request.user
-#     return render(request, 'users/home.html',{'user':user})
+
+# генерирует USDT-адрес для user_id в указанной сети (TRC20/ERC20)
+def generate_crypto_address(user_id: int, network: str) -> str:
+
+    if not settings.CRYPTO_SEED:
+        raise ValueError("CRYPTO_SEED не задан в настройках!")
+
+    try:
+        # преобразуем seed-фразу в бинарный формат
+        mnemo = Mnemonic("english")
+        seed = mnemo.to_seed(settings.CRYPTO_SEED)
+        master_key = BIP32Key.fromEntropy(seed)
+    except Exception as e:
+        print(f"ошибка при создании мастер ключа. Ошибка: {e}")
+        return "ошибка создания мастер ключа"
+
+    # генерируем адрес в зависимости от сети
+    if network == "TRC20":
+        # TRON: m/44'/195'/0'/0/{user_id}
+        key = (
+            master_key
+            .ChildKey(44 + BIP32_HARDEN)
+            .ChildKey(195 + BIP32_HARDEN)
+            .ChildKey(0 + BIP32_HARDEN)
+            .ChildKey(0)
+            .ChildKey(user_id)
+        )
+        private_key = PrivateKey(key.PrivateKey())
+        return private_key.public_key.to_base58check_address()
+
+    elif network == "ERC20":
+        # Ethereum: m/44'/60'/0'/0/{user_id}
+        key = (
+            master_key
+            .ChildKey(44 + BIP32_HARDEN)
+            .ChildKey(60 + BIP32_HARDEN)
+            .ChildKey(0 + BIP32_HARDEN)
+            .ChildKey(0)
+            .ChildKey(user_id)
+        )
+        public_key = key.PublicKey()
+        return Web3.to_checksum_address(Web3.keccak(public_key[1:])[-20:].hex())
+    return "ошибка при получении сети"
+    raise ValueError("Неподдерживаемая сеть")
+
+
+
+
+
+
 
 
 def home_view(request):
@@ -245,6 +299,8 @@ def home_view(request):
         'weekly_profit_absolute': total_pnl,
         'unrealized_pnl': unrealized_pnl,
         'pnl_error': pnl_error,
+        'trc20_address': generate_crypto_address(request.user.id, "TRC20"),
+        'erc20_address': generate_crypto_address(request.user.id, "ERC20"),
     })
 
 def profile(request):

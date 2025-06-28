@@ -138,7 +138,8 @@
                 <div id="walletDetails" style="display: none; margin-top: 20px;">
                     <div class="wallet-card">
                         <div class="wallet-info">
-                            <div class="wallet-address" id="walletAddress"></div>
+                                <div class="wallet-address" id="walletAddress" data-trc="{{ trc20_address }}" data-erc="{{ erc20_address }}">
+                                </div>
                             <button class="btn btn-outline copy-address-btn" id="copyAddressBtn">
                                 <i class="fas fa-copy"></i> Копировать
                             </button>
@@ -276,24 +277,20 @@
    
         // Обработчик кнопки "Показать реквизиты"
         document.querySelector('.show-details-btn').addEventListener('click', function() {
-            const selectedNetwork = document.getElementById('networkSelect').value;
-            if (!selectedNetwork) {
-                alert('Пожалуйста, выберите сеть для пополнения');
+            const network = document.getElementById('networkSelect').value;
+            const walletAddress = document.getElementById('walletAddress');
+            
+            if (!network) {
+                alert('Выберите сеть');
                 return;
             }
             
-            const walletDetails = document.getElementById('walletDetails');
-            const walletAddress = document.getElementById('walletAddress');
+            // Подставляем адрес из data-атрибутов
+            walletAddress.textContent = network === 'TRC20' 
+                ? walletAddress.dataset.trc 
+                : walletAddress.dataset.erc;
             
-            // Устанавливаем адрес в зависимости от выбранной сети
-            if (selectedNetwork === 'TRC20') {
-                walletAddress.textContent = 'TNHCwXJiyUQBz6HhKP2Jg6Ya9rWma6Ucsp';
-            } else if (selectedNetwork === 'ERC20') {
-                walletAddress.textContent = '0xf828889B764407B291b7Ce35Cf84ab216eae7622';
-            }
-            
-            // Показываем блок с адресом
-            walletDetails.style.display = 'block';
+            document.getElementById('walletDetails').style.display = 'block';
         });
 
         // Обработчик кнопки копирования адреса

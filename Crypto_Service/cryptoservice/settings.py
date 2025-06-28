@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions', # позволяет запоминать пользователя и его действия на страницах
     'django.contrib.messages',  # позволяет показывать одноразовые уведомления пользователю
     'django.contrib.staticfiles', # управляет CSS, JavaScript, изображениями и т.д. (нужно чтобы правильно все это подгружать)
+    'django_celery_results' # расширение для работы celery с ORM django
 ]
 
 # widdleware - промежуточное по, фильтры через которые проходят все запросы от пользователя и ответы от сайта
@@ -174,16 +175,53 @@ EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 
+# было:
+# # Добавить настройки Celery
+# # указываем адрес брокера (redis)
+# CELERY_BROKER_URL = 'redis://redis:6379/0'
+# # указываем где хранить результат работы воркеров
+# CELERY_RESULT_BACKEND = None # сохранения для основой очереди нет
 
-# Добавить настройки Celery
+# # настройки для задачи, которая пишет в бд
+# CELERY_RESULT_BACKEND_DB = 'django-db' 
+
+# # какой формат будет принимать воркер
+# CELERY_ACCEPT_CONTENT = ['json']
+# # в какой формат будет сериализована задача
+# CELERY_TASK_SERIALIZER = 'json'
+# # в какой формат будет сериализован результат
+# CELERY_RESULT_SERIALIZER = 'json'
+
+# CELERY_TIMEZONE = 'UTC'
+
+
+# стало:
+# Celery
 CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = None #'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
 
+# Очереди
+CELERY_TASK_DEFAULT_QUEUE = 'default'
+CELERY_TASK_ROUTES = {
+    'bots.tasks.check_payments': {'queue': 'payments'},
+}
+
+# Расписание
+CELERY_BEAT_SCHEDULE = {
+    'check-trc20-erc20-transactions': {
+        'task': 'bots.tasks.check_payments', # Путь к задаче
+        'schedule': 300.0,  # Каждые 5 минут
+        'options': {'queue': 'payments'}, # Очередь для задачи
+    },
+}
+
 # Добавить настройки email админа
 ADMIN_EMAIL = 'kholodaev10e@mail.ru'
 
+
+CRYPTO_SEED=os.getenv('CRYPTO_SEED').strip("'\"")
 
