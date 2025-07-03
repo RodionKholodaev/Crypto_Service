@@ -1,6 +1,6 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from .forms import BotForm, IndicatorFormSet, CustomIndicatorFormSet
+from .forms import BotForm, IndicatorFormSet
 from .models import Bot, ExchangeAccount, Indicator
 from django.core.paginator import Paginator
 from django.views.decorators.http import require_POST
@@ -44,29 +44,7 @@ def create_bot(request):
 
 @login_required
 def edit_bot(request, bot_id):
-    bot = get_object_or_404(Bot, id=bot_id, user=request.user)
-    
-    if request.method == 'POST':
-        form = BotForm(request.user, request.POST, instance=bot)
-        formset = CustomIndicatorFormSet(request.POST, instance=bot)
-        
-        if form.is_valid() and formset.is_valid():
-            bot = form.save()
-            formset.save()
-            
-            # Здесь будет логика перезапуска бота при необходимости
-            return redirect('home')
-    else:
-        form = BotForm(request.user, instance=bot)
-        formset = CustomIndicatorFormSet(instance=bot)
-    
-    return render(request, 'bots/bot_conf.html', {
-        'form': form,
-        'formset': formset,
-        'exchange_accounts': ExchangeAccount.objects.filter(user=request.user, is_active=True),
-        'editing': True  # Флаг для шаблона, что мы в режиме редактирования
-    })
-
+    pass
 
 
 @login_required
