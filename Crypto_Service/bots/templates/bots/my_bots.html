@@ -148,13 +148,12 @@
                     return;
                 }
 
-                fetch(`/bots/bots/${botId}/delete/`, {
+                fetch(`/bots/${botId}/delete/`, {  
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': csrfToken,
                         'Content-Type': 'application/json',
                     },
-                    credentials: 'same-origin'
                 })
                 .then(response => {
                     if (!response.ok) throw new Error('Ошибка сервера');
@@ -180,11 +179,11 @@
                 return;
             }
 
-            fetch(`/bots/${botId}/toggle/`, {
+            fetch(`/bots/${botId}/toggle/`, {  
                 method: 'POST',
                 headers: {
                     'X-CSRFToken': csrfToken,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({activate: activate})
             })

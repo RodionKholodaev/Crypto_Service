@@ -14,7 +14,6 @@ from django.utils import timezone
 from .models import CryptoTransaction
 
 
-
 # создает задачу для celery
 # shared_task дает использовать функцию run_trading_bot как celery task
 @shared_task(
@@ -42,8 +41,10 @@ def check_payments():
     check_erc20_payments()
 
 def check_trc20_payments():
+    # цикл по всем пользователся у которых в бд есть trc20 (по всем)
     url = f'https://api.tronscan.org/api/account/token_transfer'
     for user in User.objects.filter(trc20_address__isnull=False):
+        # параметры для запроса
         params = {
             'address': user.trc20_address,
             'token': 'TR7NHqjeKQxGTCi8q8ZY4pL8otSzgjLj6t',
@@ -54,16 +55,20 @@ def check_trc20_payments():
         }
         
         try:
+            # запрос к api
             response = requests.get(url, params=params).json()
             for tx in response.get('token_transfers', []):
                 # Проверяем в БД через exists() вместо tx.get('processed')
+                # проверяем на наличие в модели с обработаными транзакциями
                 if tx['confirmed'] and not CryptoTransaction.objects.filter(
                     tx_hash=tx['transaction_id'],
                     network='TRC20'
                 ).exists():
+                    # увеличение баланса и сохранение в бд
                     amount = float(tx['quant']) / 10**6
                     user.balance += amount
                     user.save()
+                    # кастомная функция
                     mark_transaction_processed(
                         tx_hash=tx['transaction_id'],
                         network='TRC20',
@@ -81,6 +86,7 @@ def check_erc20_payments():
     url = "https://api.etherscan.io/api"
     # проходимся по всем пользователям у которых есть erc20_address
     for user in User.objects.filter(erc20_address__isnull=False):
+        # параметры для запроса
         params = {
             "module": "account",
             "action": "tokentx",
@@ -90,12 +96,15 @@ def check_erc20_payments():
             "apikey": settings.ETHERSCAN_API_KEY,
         }
         try:
+            # запрос
             response = requests.get(url, params=params).json()
             for tx in response.get('result', []):
+                # проверка на наличие транзакции в бд
                 if not CryptoTransaction.objects.filter(
                     tx_hash=tx['hash'],
                     network='ERC20'
                 ).exists():
+                    # сохранение данных в бд
                     amount = float(tx['value']) / 10**6
                     user.balance += amount
                     user.save()
@@ -128,10 +137,6 @@ def mark_transaction_processed(tx_hash: str, network: str, user: User, amount: f
 @shared_task(queue='maintenance')
 def clean_old_transactions():
     """Удаляет транзакции старше 20 минут."""
-    from django.utils import timezone
-    from datetime import timedelta
-    from .models import CryptoTransaction
-
     CryptoTransaction.objects.filter(
         timestamp__lt=timezone.now() - timedelta(minutes=30)
     ).delete()
