@@ -245,13 +245,53 @@
                 grid-template-columns: 1fr;
             }
         }
+
+        .dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: white;
+            min-width: 120px;
+            box-shadow: 0px 8px 16px 0px rgba(0,0,0,0.2);
+            z-index: 1;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+
+        .dropdown-content a {
+            color: var(--dark);
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 14px;
+        }
+
+        .dropdown-content a:hover {
+            background-color: #f1f1f1;
+        }
+
+        .dropdown:hover .dropdown-content {
+            display: block;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1>📊 Статистика торговых ботов</h1>
-            <button id="export-btn">📤 Экспорт данных</button>
+            <div class="dropdown">
+                <button id="export-btn">📤 Экспорт данных ▼</button>
+                <div class="dropdown-content">
+                    <a href="#" id="export-csv">CSV</a>
+                    <a href="#" id="export-json">JSON</a>
+                    <a href="#" id="export-excel">Excel</a>
+                </div>
+            </div>
         </div>
 
         <!-- Фильтры -->
@@ -550,15 +590,58 @@
                 window.location.search = params.toString();
             });
 
-            // Кнопка экспорта
-            document.getElementById('export-btn').addEventListener('click', function() {
-                alert('Экспорт данных будет реализован позже');
-            });
-
             // Кнопка обновления
             document.getElementById('refresh-trades').addEventListener('click', function() {
                 window.location.reload();
             });
+        }
+        // Кнопки экспорта
+        document.getElementById('export-csv').addEventListener('click', function(e) {
+            e.preventDefault();
+            exportData('csv');
+        });
+
+        document.getElementById('export-json').addEventListener('click', function(e) {
+            e.preventDefault();
+            exportData('json');
+        });
+
+        document.getElementById('export-excel').addEventListener('click', function(e) {
+            e.preventDefault();
+            exportData('excel');
+        });
+
+        function exportData(format) {
+            // Собираем параметры фильтров
+            const params = new URLSearchParams();
+            
+            const timePeriod = document.getElementById('time-period').value;
+            params.set('time_period', timePeriod);
+            
+            if (timePeriod === 'custom') {
+                const dateFrom = document.getElementById('date-from').value;
+                const dateTo = document.getElementById('date-to').value;
+                if (dateFrom && dateTo) {
+                    params.set('date_from', dateFrom);
+                    params.set('date_to', dateTo);
+                }
+            }
+            
+            const botFilter = document.getElementById('bot-filter').value;
+            if (botFilter !== 'all') {
+                params.set('bot_filter', botFilter);
+            }
+            
+            const pairFilter = document.getElementById('pair-filter').value;
+            if (pairFilter !== 'all') {
+                params.set('pair_filter', pairFilter);
+            }
+            
+            // Добавляем параметр формата
+            params.set('export_format', format);
+            
+            // Отправляем запрос на сервер
+            window.location.href = `/analytics/export_deals/?${params.toString()}`;
         }
     </script>
 </body>

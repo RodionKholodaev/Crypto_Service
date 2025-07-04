@@ -6,6 +6,14 @@ from datetime import timedelta
 from bots.models import Deal, Bot
 from django.db.models.functions import TruncDay
 
+from django.http import HttpResponse, JsonResponse
+from django.views import View
+import csv
+import json
+from openpyxl import Workbook
+from io import BytesIO
+from bots.models import Deal
+
 def dashboard_view(request):
     # Фильтрация сделок (только закрытые и исполненные)
     deals = Deal.objects.filter(
@@ -86,3 +94,146 @@ def dashboard_view(request):
         'time_period': time_period,
     }
     return render(request, 'analytics/dashboard.html', context)
+
+# скачивание данных
+class ExportDealsView(View):
+    def get(self, request):
+        # Получаем фильтры из запроса
+        deals = Deal.objects.filter(bot__user=request.user)
+        
+        # Применяем фильтры
+        time_period = request.GET.get('time_period', 'today')
+        if time_period == 'today':
+            deals = deals.filter(created_at__date=timezone.now().date())
+        elif time_period == 'week':
+            deals = deals.filter(created_at__gte=timezone.now() - timezone.timedelta(days=7))
+        elif time_period == 'month':
+            deals = deals.filter(created_at__gte=timezone.now() - timezone.timedelta(days=30))
+        elif time_period == 'custom':
+            date_from = request.GET.get('date_from')
+            date_to = request.GET.get('date_to')
+            if date_from and date_to:
+                deals = deals.filter(created_at__date__gte=date_from, created_at__date__lte=date_to)
+        
+        bot_filter = request.GET.get('bot_filter')
+        if bot_filter and bot_filter != 'all':
+            deals = deals.filter(bot_id=bot_filter)
+        
+        pair_filter = request.GET.get('pair_filter')
+        if pair_filter and pair_filter != 'all':
+            deals = deals.filter(trading_pair=pair_filter)
+        
+        # Получаем формат экспорта
+        export_format = request.GET.get('export_format', 'csv')
+        
+        # Подготавливаем данные
+        deals_data = deals.values(
+            'created_at',
+            'bot__name',
+            'trading_pair',
+            'volume',
+            'entry_price',
+            'take_profit_price',
+            'stop_loss_price',
+            'pnl',
+            'exchange_commission',
+            'service_commission',
+            'order_id',
+            'is_filled'
+        )
+        
+        # Экспорт в выбранном формате
+        if export_format == 'csv':
+            return self.export_csv(deals_data)
+        elif export_format == 'json':
+            return self.export_json(deals_data)
+        elif export_format == 'excel':
+            return self.export_excel(deals_data)
+        else:
+            return HttpResponse("Unsupported format", status=400)
+    
+    def export_csv(self, queryset):
+        response = HttpResponse(
+            content_type='text/csv; charset=utf-8-sig'  # utf-8-sig для Excel
+        )
+        response['Content-Disposition'] = 'attachment; filename="deals_export.csv"'
+        
+        writer = csv.writer(response, delimiter=';')  # Используем ; как разделитель
+        
+        # Заголовки
+        headers = [
+            'Date', 'Bot Name', 'Trading Pair', 'Volume', 
+            'Entry Price', 'Take Profit', 'Stop Loss', 'PNL',
+            'Exchange Commission', 'Service Commission', 'Order ID', 'Is Filled'
+        ]
+        writer.writerow(headers)
+        
+        # Данные
+        for deal in queryset:
+            writer.writerow([
+                deal['created_at'].strftime('%Y-%m-%d %H:%M:%S'),
+                deal['bot__name'],
+                deal['trading_pair'],
+                str(deal['volume']).replace('.', ','),  # Для русской локализации
+                str(deal['entry_price']).replace('.', ','),
+                str(deal['take_profit_price']).replace('.', ','),
+                str(deal['stop_loss_price']).replace('.', ',') if deal['stop_loss_price'] else '',
+                str(deal['pnl']).replace('.', ','),
+                str(deal['exchange_commission']).replace('.', ','),
+                str(deal['service_commission']).replace('.', ','),
+                deal['order_id'] or '',
+                'Yes' if deal['is_filled'] else 'No'
+            ])
+        
+        return response
+    
+    def export_json(self, queryset):
+        data = list(queryset)
+        for item in data:
+            item['created_at'] = item['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            item['is_filled'] = 'Yes' if item['is_filled'] else 'No'
+        
+        response = JsonResponse(data, safe=False)
+        response['Content-Disposition'] = 'attachment; filename="deals_export.json"'
+        return response
+    
+    def export_excel(self, queryset):
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Deals"
+        
+        # Заголовки
+        ws.append([
+            'Date', 'Bot Name', 'Trading Pair', 'Volume', 'Entry Price', 
+            'Take Profit', 'Stop Loss', 'PNL', 'Exchange Commission', 
+            'Service Commission', 'Order ID', 'Is Filled'
+        ])
+        
+        # Данные
+        for deal in queryset:
+            ws.append([
+                deal['created_at'].strftime('%Y-%m-%d %H:%M:%S'),
+                deal['bot__name'],
+                deal['trading_pair'],
+                float(deal['volume']),
+                float(deal['entry_price']),
+                float(deal['take_profit_price']),
+                float(deal['stop_loss_price']) if deal['stop_loss_price'] else None,
+                float(deal['pnl']),
+                float(deal['exchange_commission']),
+                float(deal['service_commission']),
+                deal['order_id'] or '',
+                'Yes' if deal['is_filled'] else 'No'
+            ])
+        
+        # Сохраняем в BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        
+        response = HttpResponse(
+            output.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="deals_export.xlsx"'
+        return response

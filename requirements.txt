@@ -24,3 +24,5 @@ mnemonic
 bip32utils
 tronpy
 web3
+
+openpyxl==3.1.2
