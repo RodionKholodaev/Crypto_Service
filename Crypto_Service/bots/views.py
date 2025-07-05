@@ -44,7 +44,52 @@ def create_bot(request):
 
 @login_required
 def edit_bot(request, bot_id):
-    pass
+    bot = get_object_or_404(Bot, id=bot_id, user=request.user)
+    
+    if request.method == 'POST':
+        form = BotForm(request.user, request.POST, instance=bot)
+        formset = IndicatorFormSet(request.POST, instance=bot)
+        
+        if form.is_valid() and formset.is_valid():
+            if 'confirm_save' in request.POST:  # Если подтверждение получено
+                # Сохраняем настройки в JSON
+                settings_data = {
+                    'form_data': form.cleaned_data,
+                    'indicators': [{
+                        'indicator_type': form.cleaned_data.get('indicator_type'),
+                        'timeframe': form.cleaned_data.get('timeframe'),
+                        'condition': form.cleaned_data.get('condition'),
+                        'value': form.cleaned_data.get('value')
+                    } for form in formset.forms if form.cleaned_data and not form.cleaned_data.get('DELETE', False)]
+                }
+                
+                bot.settings_json = settings_data
+                bot.save()
+                
+                # Сохраняем форму и индикаторы
+                bot = form.save()
+                formset.save()
+                
+                return redirect('home')
+            else:  # Если нужно показать подтверждение
+                return render(request, 'bots/edit_bot.html', {
+                    'form': form,
+                    'formset': formset,
+                    'exchange_accounts': ExchangeAccount.objects.filter(user=request.user, is_active=True),
+                    'bot': bot,
+                    'show_confirmation': True  # Флаг для показа модального окна
+                })
+    else:
+        form = BotForm(user=request.user, instance=bot)
+        formset = IndicatorFormSet(instance=bot, queryset=Indicator.objects.filter(bot=bot))
+    
+    return render(request, 'bots/edit_bot.html', {
+        'form': form,
+        'formset': formset,
+        'exchange_accounts': ExchangeAccount.objects.filter(user=request.user, is_active=True),
+        'bot': bot,
+        'show_confirmation': True 
+    })
 
 
 @login_required

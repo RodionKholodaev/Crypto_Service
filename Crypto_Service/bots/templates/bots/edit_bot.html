@@ -1,196 +1,228 @@
-{% load static %}
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Редактирование бота | CryptoBotHub</title>
-    <link rel="stylesheet" href="{% static 'bots/css/style.css' %}">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
-</head>
-<body>
-    <div class="container">
-        <div class="page-header">
-            <h1 class="page-title">Редактирование бота</h1>
-            <a href="{% url 'my_bots' %}" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Назад к ботам</a>
+{% extends 'bots/bot_conf.html' %}
+
+
+{% block strategy %}
+<div class="form-group">
+    <label class="form-label">Алгоритм торговли</label>
+    <div class="mode-selector">
+        <div class="mode-option {% if form.instance.strategy %}active{% endif %}" onclick="selectMode(this, 'long')">
+            <h4>Long</h4>
+            <p>Покупка с ожиданием роста</p>
         </div>
-
-        <form class="bot-creation-form" method="post" action="{% url 'edit_bot' bot_id %}">
-            {% csrf_token %}
-
-            <div class="form-section">
-                <div class="form-group">
-                    <label class="form-label">API Ключ</label>
-                    <div class="dropdown">
-                        <select name="exchange_account" class="form-control" required id="apiKeySelect">
-                            {% for account in exchange_accounts %}
-                                <option value="{{ account.id }}" {% if form.exchange_account.value|stringformat:"s" == account.id|stringformat:"s" %}selected{% endif %}>{{ account.name }} ({{ account.get_exchange_display }})</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2 class="section-title"><i class="fas fa-robot"></i> Стратегия торговли</h2>
-                <div class="form-group">
-                    <label class="form-label">Алгоритм торговли</label>
-                    <div class="mode-selector">
-                        <div class="mode-option {% if form.strategy.value %}active{% endif %}" onclick="selectMode(this, 'long')">
-                            <h4>Long</h4>
-                            <p>Покупка с ожиданием роста</p>
-                        </div>
-                        <div class="mode-option {% if not form.strategy.value %}active{% endif %}" onclick="selectMode(this, 'short')">
-                            <h4>Short</h4>
-                            <p>Продажа с ожиданием падения</p>
-                        </div>
-                    </div>
-                    <input type="hidden" name="strategy" id="tradingMode" value="{{ form.strategy.value }}">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Торговая пара</label>
-                    <div class="pair-selector">
-                        <div class="dropdown" style="flex: 1;">
-                            <select name="base_currency" class="form-control" id="baseCurrencySelect">
-
-                                    <option value="BTC" {% if form.base_currency.value == 'BTC' %}selected{% endif %}>BTC</option>
-                                    <option value="ETH" {% if form.base_currency.value == 'ETH' %}selected{% endif %}>ETH</option>
-                                    <option value="BNB" {% if form.base_currency.value == 'BNB' %}selected{% endif %}>BNB</option>
-                                    <option value="SOL" {% if form.base_currency.value == 'SOL' %}selected{% endif %}>SOL</option>
-                                    <option value="XRP" {% if form.base_currency.value == 'XRP' %}selected{% endif %}>XRP</option>
-    
-                            </select>
-                        </div>
-                        <span class="pair-divider">/USDT</span>
-                    </div>
-                    <div id="customCurrencyInput" style="display: {% if form.base_currency.value == 'CUSTOM' %}block{% else %}none{% endif %}; margin-top: 10px;">
-                        <input type="text" name="custom_currency" value="{{ form.custom_currency.value|default_if_none:'' }}">
-
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Размер депозита (USDT)</label>
-                    <input type="number" class="form-control" name="deposit" placeholder="1000" min="0" step="0.01" required value="{{ form.deposit.value|default_if_none:'' }}">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Плечо <span id="leverageValue">{{ form.bot_leverage.value|default_if_none:'10' }}x</span></label>
-                    <input type="range" min="1" max="50" value="{{ form.bot_leverage.value|default_if_none:'10' }}" class="leverage-slider" id="leverageSlider" name="bot_leverage">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Режим торговли</label>
-                    <div class="mode-selector">
-                        <div class="mode-option {% if not form.grid_overlap_percent.value or form.grid_overlap_percent.value == '40' %}active{% endif %}" onclick="selectTradingStyle(this, 'conservative')">
-                            <h4>Консервативный</h4>
-                            <p>Меньше сделок, ниже риск</p>
-                        </div>
-                        <div class="mode-option {% if form.grid_overlap_percent.value == '25' %}active{% endif %}" onclick="selectTradingStyle(this, 'moderate')">
-                            <h4>Умеренный</h4>
-                            <p>Баланс риска и прибыли</p>
-                        </div>
-                        <div class="mode-option {% if form.grid_overlap_percent.value == '15' %}active{% endif %}" onclick="selectTradingStyle(this, 'aggressive')">
-                            <h4>Агрессивный</h4>
-                            <p>Больше сделок, выше риск</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="grid-settings">
-                    <div class="grid-setting">
-                        <div class="form-group">
-                            <label class="form-label">Перекрытие ордеров (%)</label>
-                            <input type="number" class="form-control" id="orderOverlap" name="grid_overlap_percent" placeholder="40" min="0.5" max="99" step="0.1" value="{{ form.grid_overlap_percent.value|default_if_none:'40' }}">
-                        </div>
-                    </div>
-                    <div class="grid-setting">
-                        <div class="form-group">
-                            <label class="form-label">Сетка ордеров</label>
-                            <input type="number" class="form-control" id="orderGridCount" name="grid_orders_count" placeholder="20" min="2" max="60" step="1" value="{{ form.grid_orders_count.value|default_if_none:'20' }}">
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Название бота</label>
-                    <input type="text" class="form-control" name="name" placeholder="Мой прибыльный бот" required value="{{ form.name.value|default_if_none:'' }}">
-                </div>
-            </div>
-
-            <div class="form-section">
-                <h2 class="section-title"><i class="fas fa-chart-line"></i> Индикаторы для входа</h2>
-                <div style="display:none;">
-                    {{ formset.management_form }}
-                </div>
-                <div id="indicatorsContainer">
-                    {% for indicator_form in formset %}
-                    <div class="indicator-form">
-                        {{ indicator_form.id }}
-                        <div class="indicator-row">
-                            <div class="form-group">
-                                <label class="form-label">Индикатор</label>
-                                {{ indicator_form.indicator_type }}
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Таймфрейм</label>
-                                {{ indicator_form.timeframe }}
-                            </div>
-                        </div>
-                        <div class="indicator-row">
-                            <div class="form-group">
-                                <label class="form-label">Условие</label>
-                                {{ indicator_form.condition }}
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">Значение</label>
-                                {{ indicator_form.value }}
-                            </div>
-                        </div>
-                        <button type="button" class="btn btn-outline" onclick="this.parentNode.remove()" style="margin-top: 10px;">
-                            <i class="fas fa-trash"></i> Удалить индикатор
-                        </button>
-                    </div>
-                    {% endfor %}
-                </div>
-                <button type="button" class="btn btn-outline add-indicator-btn" onclick="addIndicator()">
-                    <i class="fas fa-plus"></i> Добавить индикатор
-                </button>
-            </div>
-
-            <div class="form-section">
-                <h2 class="section-title"><i class="fas fa-shield-alt"></i> Управление рисками</h2>
-                <div class="grid-settings">
-                    <div class="grid-setting">
-                        <div class="form-group">
-                            <label class="form-label">Take Profit (%)</label>
-                            <input type="number" class="form-control" name="take_profit_percent" placeholder="5" min="0.1" max="100" step="0.1" required value="{{ form.take_profit_percent.value|default_if_none:'' }}">
-                        </div>
-                    </div>
-                    <div class="grid-setting">
-                        <div class="form-group">
-                            <label class="form-label">
-                                Добавить Stop Loss
-                                <label class="toggle-switch">
-                                    <input type="checkbox" id="stopLossToggle" {% if form.stop_loss_percent.value %}checked{% endif %}>
-                                    <span class="slider"></span>
-                                </label>
-                            </label>
-                            <div class="stop-loss-container" id="stopLossContainer" style="display: {% if form.stop_loss_percent.value %}block{% else %}none{% endif %};">
-                                <input type="number" class="form-control" name="stop_loss_percent" id="stopLossValue" placeholder="2" min="0.1" max="100" step="0.1" value="{{ form.stop_loss_percent.value|default_if_none:'' }}">
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="form-actions">
-                <div>
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Сохранить изменения</button>
-                </div>
-            </div>
-        </form>
+        <div class="mode-option {% if not form.instance.strategy %}active{% endif %}" onclick="selectMode(this, 'short')">
+            <h4>Short</h4>
+            <p>Продажа с ожиданием падения</p>
+        </div>
     </div>
-</body>
-</html>
+    <input type="hidden" name="strategy" id="tradingMode" 
+            value="{% if form.instance.strategy %}True{% else %}False{% endif %}">
+</div>
+{% endblock %}
+
+{% block currency %}
+<div class="form-group">
+    <label class="form-label">Торговая пара</label>
+    <div class="pair-selector">
+        <div class="dropdown" style="flex: 1;">
+            <select name="base_currency" class="form-control" id="baseCurrencySelect">
+                {% for value, label in form.base_currency.field.choices %}
+                    <option value="{{ value }}" {% if value == form.base_currency.value %}selected{% endif %}>
+                        {{ label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <span class="pair-divider">/USDT</span>
+    </div>
+    <div id="customCurrencyInput" style="display: {% if form.base_currency.value == 'CUSTOM' %}block{% else %}none{% endif %}; margin-top: 10px;">
+        <input type="text" class="form-control" name="custom_currency" 
+                value="{{ form.custom_currency.value|default:'' }}" 
+                placeholder="Введите код валюты (например: ADA)">
+    </div>
+</div>
+{% endblock %}
+
+{% block indicators_section %}
+<div class="form-section">
+    <h2 class="section-title"><i class="fas fa-chart-line"></i> Индикаторы для входа</h2>
+    <!-- Индикаторы -->
+    <div style="display:none;">
+        {{ formset.management_form }}
+    </div>
+    <div id="indicatorsContainer">
+        {% for form in formset %}
+            {% if not form.DELETE.value %}  <!-- Исключаем удалённые индикаторы -->
+                <div class="indicator-form">
+                    {{ form.id }}
+                    <div class="indicator-row">
+                        <div class="form-group">
+                            <label class="form-label">Индикатор</label>
+                            {{ form.indicator_type }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Таймфрейм</label>
+                            {{ form.timeframe }}
+                        </div>
+                    </div>
+                    <div class="indicator-row">
+                        <div class="form-group">
+                            <label class="form-label">Условие</label>
+                            {{ form.condition }}
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Значение</label>
+                            {{ form.value }}
+                        </div>
+                    </div>
+                    <button type="button" class="btn btn-outline" onclick="this.parentNode.remove()">
+                        <i class="fas fa-trash"></i> Удалить индикатор
+                    </button>
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    
+    <button type="button" class="btn btn-outline add-indicator-btn" onclick="addIndicator()">
+        <i class="fas fa-plus"></i> Добавить индикатор
+    </button>
+</div>
+{% endblock %}
+
+
+{% block risk_management %}
+<div class="form-section">
+    <h2 class="section-title"><i class="fas fa-shield-alt"></i> Управление рисками</h2>
+    
+    <div class="grid-settings">
+        <div class="grid-setting">
+            <div class="form-group">
+                <label class="form-label">Take Profit (%)</label>
+                <input type="number" class="form-control" name="take_profit_percent" 
+                       value="{{ form.instance.take_profit_percent|floatformat:1 }}" 
+                       min="0.1" max="100" step="0.1" required>
+            </div>
+        </div>
+        
+        <div class="grid-setting">
+            <div class="form-group">
+                <label class="form-label">
+                    Добавить Stop Loss
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="stopLossToggle" {% if form.instance.stop_loss_percent %}checked{% endif %}>
+                        <span class="slider"></span>
+                    </label>
+                </label>
+                <div class="stop-loss-container" id="stopLossContainer" 
+                     style="display: {% if form.instance.stop_loss_percent %}block{% else %}none{% endif %};">
+                    <input type="number" class="form-control" name="stop_loss_percent" id="stopLossValue" 
+                           value="{{ form.instance.stop_loss_percent|floatformat:1|default:'' }}" 
+                           placeholder="2" min="0.1" max="100" step="0.1">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block form_actions %}
+<div class="form-actions">
+    <div>
+        <button type="submit" class="btn btn-primary" name="save_settings">
+            <i class="fas fa-save"></i> Сохранить настройки
+        </button>
+    </div>
+</div>
+
+<!-- Модальное окно подтверждения -->
+{% if show_confirmation %}
+<div class="modal-overlay" id="confirmationModal">
+    <div class="modal-content">
+        <h3>Подтверждение изменений</h3>
+        <p>Новые настройки будут применены после выхода бота из текущих сделок.</p>
+        <div class="modal-actions">
+            <button type="button" class="btn btn-outline" onclick="document.getElementById('confirmationModal').style.display='none'">
+                Отмена
+            </button>
+            <button type="submit" class="btn btn-primary" name="confirm_save">
+                Подтвердить
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация ползунка плеча
+    const leverageSlider = document.getElementById('leverageSlider');
+    const leverageValue = document.getElementById('leverageValue');
+    
+    // Устанавливаем начальное значение из формы
+    leverageSlider.value = {{ form.bot_leverage.value|default:10 }};
+    leverageValue.textContent = leverageSlider.value + 'x';
+    
+    leverageSlider.addEventListener('input', function() {
+        leverageValue.textContent = this.value + 'x';
+    });
+});
+</script>
+{% endif %}
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Инициализация ползунка плеча
+    const leverageSlider = document.getElementById('leverageSlider');
+    const leverageValue = document.getElementById('leverageValue');
+    leverageSlider.value = {{ form.instance.bot_leverage|default:10 }};
+    leverageValue.textContent = leverageSlider.value + 'x';
+    
+    leverageSlider.addEventListener('input', function() {
+        leverageValue.textContent = this.value + 'x';
+    });
+
+    // Обработка выбора валюты
+    document.getElementById('baseCurrencySelect').addEventListener('change', function() {
+        const customInput = document.getElementById('customCurrencyInput');
+        customInput.style.display = (this.value === 'CUSTOM') ? 'block' : 'none';
+    });
+
+    // Обработка Stop Loss
+    document.getElementById('stopLossToggle').addEventListener('change', function() {
+        const stopLossContainer = document.getElementById('stopLossContainer');
+        stopLossContainer.style.display = this.checked ? 'block' : 'none';
+        if (!this.checked) {
+            document.getElementById('stopLossValue').value = '';
+        }
+    });
+});
+</script>
+{% endblock %}
+
+<!-- Добавим стили для модального окна -->
+<style>
+.modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
+.modal-content {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    max-width: 500px;
+}
+.modal-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 20px;
+    gap: 10px;
+}
+</style>

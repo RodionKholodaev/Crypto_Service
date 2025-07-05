@@ -3,6 +3,24 @@ from django.forms import inlineformset_factory
 from .models import Bot, Indicator, ExchangeAccount
 
 class IndicatorForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        
+        # Для существующих индикаторов
+        if self.instance and self.instance.pk:
+            # Загружаем параметры из JSON
+            params = self.instance.parameters or {}
+            
+            # Устанавливаем начальные значения
+            self.fields['condition'].initial = params.get('condition')
+            self.fields['value'].initial = params.get('value')
+            
+            # Для новых индикаторов устанавливаем значения по умолчанию
+            if not self.initial.get('condition'):
+                self.fields['condition'].initial = 'gte'
+            if not self.initial.get('value'):
+                self.fields['value'].initial = 30
     # списки для ChoiceField
     INDICATOR_CHOICES = [
         ('RSI', 'Relative Strength Index'),
@@ -90,6 +108,8 @@ class BotForm(forms.ModelForm):
     def __init__(self, user, *args, **kwargs):
         # запуск __init__ родительской формы
         super().__init__(*args, **kwargs)
+        self.fields['exchange_account'].queryset = ExchangeAccount.objects.filter(user=user, is_active=True)
+
         # выбирает api ключи пользователя и is_active=True
 
         # QuerySet — это специальный объект в Django. Он обращается к бд но не сразу
@@ -98,7 +118,6 @@ class BotForm(forms.ModelForm):
         # ExchangeAccount.objects.filter(...) возвращает стуктуру QuerySet
         # ExchangeAccount.objects.filter(...) - замена кода sql
         # из этого набора будет формироваться списко в выподающей html форме
-        self.fields['exchange_account'].queryset = ExchangeAccount.objects.filter(user=user, is_active=True)
         
         # проверка, редактируем ли мы бот или создаем
         # instance - экземпляр модели с которой работает modelform
@@ -171,3 +190,4 @@ class BotForm(forms.ModelForm):
 # пример:
 # obj = form.save()  # Сохраняет в БД
 # obj = form.save(commit=False)  # Возвращает объект, но не сохраняет
+
