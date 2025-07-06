@@ -86,13 +86,13 @@
                     </div>
                     
                     <div class="bot-actions">
-                        <a href="{% url 'edit_bot' bot.id %}" class="btn-action edit" title="Редактировать">
+                        {% comment %} <a href="{% url 'edit_bot' bot.id %}" class="btn-action edit" title="Редактировать">
                             <i class="fas fa-cog"></i>
-                        </a>
+                        </a> {% endcomment %}
                         <button class="btn-action delete" onclick="confirmDelete({{ bot.id }})" title="Удалить">
                             <i class="fas fa-trash"></i>
                         </button>
-                        {% if bot.is_active %}
+                        {% comment %} {% if bot.is_active %}
                             <button class="btn-action stop" title="Остановить" onclick="toggleBot({{ bot.id }}, false)">
                                 <i class="fas fa-power-off"></i>
                             </button>
@@ -100,10 +100,17 @@
                             <button class="btn-action start" title="Запустить" onclick="toggleBot({{ bot.id }}, true)">
                                 <i class="fas fa-play"></i>
                             </button>
-                        {% endif %}
+                        {% endif %} {% endcomment %}
+
+
+                        {% comment %}
                         <a href="{% url 'bot_details' bot.id %}" class="btn-action info" title="Подробнее">
                             <i class="fas fa-chart-line"></i>
                         </a>
+                        {% endcomment %}
+
+
+
                     </div>
                 </div>
                 {% endfor %}
@@ -148,7 +155,7 @@
                     return;
                 }
 
-                fetch(`/bots/${botId}/delete/`, {  
+                fetch(`/bots/bots/${botId}/delete/`, {  
                     method: 'POST',
                     headers: {
                         'X-CSRFToken': csrfToken,
