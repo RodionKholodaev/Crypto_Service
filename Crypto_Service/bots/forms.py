@@ -2,26 +2,105 @@ from django import forms
 from django.forms import inlineformset_factory
 from .models import Bot, Indicator, ExchangeAccount
 
-class IndicatorForm(forms.ModelForm):
+# class IndicatorForm(forms.ModelForm):
 
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+        
+#         # Для существующих индикаторов
+#         if self.instance and self.instance.pk:
+#             # Загружаем параметры из JSON
+#             params = self.instance.parameters or {}
+            
+#             # Устанавливаем начальные значения
+#             self.fields['condition'].initial = params.get('condition')
+#             self.fields['value'].initial = params.get('value')
+            
+#             # Для новых индикаторов устанавливаем значения по умолчанию
+#             if not self.initial.get('condition'):
+#                 self.fields['condition'].initial = 'gte'
+#             if not self.initial.get('value'):
+#                 self.fields['value'].initial = 30
+#     # списки для ChoiceField
+#     INDICATOR_CHOICES = [
+#         ('RSI', 'Relative Strength Index'),
+#         ('CCI', 'Commodity Channel Index'),
+#     ]
+    
+#     TIMEFRAME_CHOICES = [
+#         ('1m', '1 минута'),
+#         ('5m', '5 минут'),
+#         ('15m', '15 минут'),
+#         ('30m', '30 минут'),
+#         ('1h', '1 час'),
+#         ('4h', '4 часа'),
+#         ('1d', '1 день'),
+#     ]
+    
+#     CONDITION_CHOICES = [
+#         ('lt', '<'),
+#         ('lte', '<='),
+#         ('gt', '>'),
+#         ('gte', '>='),
+#     ]
+    
+#     indicator_type = forms.ChoiceField(choices=INDICATOR_CHOICES, label="Индикатор")
+#     timeframe = forms.ChoiceField(choices=TIMEFRAME_CHOICES, label="Таймфрейм")
+#     condition = forms.ChoiceField(choices=CONDITION_CHOICES, label="Условие")
+#     value = forms.FloatField(label="Значение")
+    
+#     # связь с бд и указание полей
+#     class Meta:
+#         model = Indicator
+#         fields = ['indicator_type', 'timeframe']
+#         # указываем какие поля модели не нужно включать в форму
+#         exclude = ['parameters']
+    
+#     # метод для сохранения данных в бд
+#     def save(self, commit=True):
+#         # через super() обращаемся к родительскому классу у indicator (models.Model) и у него вызываем метод save()
+#         # сначала не сохраняем данные, что бы добавить поле parameters (это нужно потому что parameters собирает значение из двух полей)
+#         indicator = super().save(commit=False)
+#         # заполняем поле parameters
+#         # собираем parameters и только потом сохраняем это в бд
+#         # это частая практика
+#         indicator.parameters = {
+#             'condition': self.cleaned_data['condition'],
+#             'value': self.cleaned_data['value']
+#         }
+#         # сохраняем данные в бд, так как commit=True
+#         if commit:
+#             indicator.save()
+#         return indicator
+
+# IndicatorFormSet = inlineformset_factory(  # обработка формы, которая появляется по кнопке (inline формы)
+#     Bot, Indicator, 
+#     form=IndicatorForm,
+#     extra=1,
+#     can_delete=True
+# )
+
+
+
+
+class IndicatorForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
         # Для существующих индикаторов
         if self.instance and self.instance.pk:
+            # Устанавливаем начальные значения из модели
+            self.fields['indicator_type'].initial = self.instance.indicator_type
+            self.fields['timeframe'].initial = self.instance.timeframe
             # Загружаем параметры из JSON
             params = self.instance.parameters or {}
-            
-            # Устанавливаем начальные значения
-            self.fields['condition'].initial = params.get('condition')
-            self.fields['value'].initial = params.get('value')
-            
-            # Для новых индикаторов устанавливаем значения по умолчанию
-            if not self.initial.get('condition'):
-                self.fields['condition'].initial = 'gte'
-            if not self.initial.get('value'):
-                self.fields['value'].initial = 30
-    # списки для ChoiceField
+            self.fields['condition'].initial = params.get('condition', 'gte')
+            self.fields['value'].initial = params.get('value', 30)
+        else:
+            # Для новых индикаторов
+            self.fields['condition'].initial = 'gte'
+            self.fields['value'].initial = 30
+
     INDICATOR_CHOICES = [
         ('RSI', 'Relative Strength Index'),
         ('CCI', 'Commodity Channel Index'),
@@ -49,36 +128,29 @@ class IndicatorForm(forms.ModelForm):
     condition = forms.ChoiceField(choices=CONDITION_CHOICES, label="Условие")
     value = forms.FloatField(label="Значение")
     
-    # связь с бд и указание полей
     class Meta:
         model = Indicator
-        fields = ['indicator_type', 'timeframe']
-        # указываем какие поля модели не нужно включать в форму
+        fields = ['indicator_type', 'timeframe', 'condition', 'value']
         exclude = ['parameters']
     
-    # метод для сохранения данных в бд
     def save(self, commit=True):
-        # через super() обращаемся к родительскому классу у indicator (models.Model) и у него вызываем метод save()
-        # сначала не сохраняем данные, что бы добавить поле parameters (это нужно потому что parameters собирает значение из двух полей)
         indicator = super().save(commit=False)
-        # заполняем поле parameters
-        # собираем parameters и только потом сохраняем это в бд
-        # это частая практика
         indicator.parameters = {
             'condition': self.cleaned_data['condition'],
             'value': self.cleaned_data['value']
         }
-        # сохраняем данные в бд, так как commit=True
         if commit:
             indicator.save()
         return indicator
 
-IndicatorFormSet = inlineformset_factory(  # обработка формы, которая появляется по кнопке (inline формы)
+IndicatorFormSet = inlineformset_factory(
     Bot, Indicator, 
     form=IndicatorForm,
-    extra=1,
+    extra=0,  
     can_delete=True
 )
+
+
 
 
 
@@ -92,8 +164,6 @@ class BotForm(forms.ModelForm):
         ('CUSTOM', 'Другая'),
     ]
     
-    # виртуальные поля формы которых нет в модели
-    # из этих полей мы собираем 
     base_currency = forms.ChoiceField(choices=BASE_CURRENCY_CHOICES, label="Базовая валюта")
     custom_currency = forms.CharField(required=False, label="Пользовательская валюта")
     
@@ -106,47 +176,23 @@ class BotForm(forms.ModelForm):
         ]
    
     def __init__(self, user, *args, **kwargs):
-        # запуск __init__ родительской формы
         super().__init__(*args, **kwargs)
         self.fields['exchange_account'].queryset = ExchangeAccount.objects.filter(user=user, is_active=True)
-
-        # выбирает api ключи пользователя и is_active=True
-
-        # QuerySet — это специальный объект в Django. Он обращается к бд но не сразу
-        # каждое поле что связано с моделью имее атрибут queryset
-        #  в этом поле мы меняем queryset для exchange_account чтобы там были только активные аккаунты пользователя
-        # ExchangeAccount.objects.filter(...) возвращает стуктуру QuerySet
-        # ExchangeAccount.objects.filter(...) - замена кода sql
-        # из этого набора будет формироваться списко в выподающей html форме
         
-        # проверка, редактируем ли мы бот или создаем
-        # instance - экземпляр модели с которой работает modelform
-        # если форма создается для редактирования существубщего обекта, то в instance будут его поля
-        # если объект пока не существует, то в self.instance будет None
-        # что есть в instance:
-        # pk, save(), delete(), id, все поля модели
-        # initial - начальные значения для полей формы
-        # в коде это используется для передачи с имеющихся данных при редактировании
-        # pk - уникальный индентификатор записи в таблице
-        # если pk существует -> объект сохранен в бд
-        # если pk=None -> обект пока не существует
-
-        if self.instance.pk:
+        if self.instance.pk and self.instance.trading_pair:
             trading_pair = self.instance.trading_pair
-            # есть ли у бота trading_pair
-            if trading_pair:
-                # Удаляем 'USDT' из конца строки
-                base = trading_pair[:-4]  # предполагаем формат XXXXXUSDT
-                
-                # преобразуем список из кортежей с словарь
+            # Проверяем, что trading_pair заканчивается на USDT
+            if trading_pair.endswith('USDT'):
+                base = trading_pair[:-4]  # Удаляем 'USDT'
                 base_choices = dict(self.BASE_CURRENCY_CHOICES)
-                
-                # проверяем есть ли валюта в BASE_CURRENCY_CHOICES
                 if base not in base_choices:
                     self.fields['base_currency'].initial = 'CUSTOM'
                     self.fields['custom_currency'].initial = base
                 else:
                     self.fields['base_currency'].initial = base
+            else:
+                # Если trading_pair в неожиданном формате, устанавливаем по умолчанию
+                self.fields['base_currency'].initial = 'BTC'
     
     def save(self, commit=True):
         bot = super().save(commit=False)

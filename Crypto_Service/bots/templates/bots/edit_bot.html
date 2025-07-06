@@ -20,109 +20,101 @@
 {% endblock %}
 
 {% block currency %}
-<div class="form-group">
-    <label class="form-label">Торговая пара</label>
-    <div class="pair-selector">
-        <div class="dropdown" style="flex: 1;">
-            <select name="base_currency" class="form-control" id="baseCurrencySelect">
+    <div class="currency-section">
+        <h3>Торговая пара</h3>
+        <div class="currency-inputs">
+            <div class="currency-radio">
                 {% for value, label in form.base_currency.field.choices %}
-                    <option value="{{ value }}" {% if value == form.base_currency.value %}selected{% endif %}>
+                    <label>
+                        <input type="radio" name="{{ form.base_currency.name }}" value="{{ value }}"
+                               {% if form.base_currency.value == value or form.base_currency.initial == value %}checked{% endif %}>
                         {{ label }}
-                    </option>
+                    </label>
                 {% endfor %}
-            </select>
+            </div>
+            <span>/USDT</span>
         </div>
-        <span class="pair-divider">/USDT</span>
+        {% if form.base_currency.value == 'CUSTOM' or form.base_currency.initial == 'CUSTOM' %}
+            <div class="custom-currency">
+                <label for="{{ form.custom_currency.id_for_label }}">Пользовательская валюта</label>
+                {{ form.custom_currency }}
+            </div>
+        {% endif %}
     </div>
-    <div id="customCurrencyInput" style="display: {% if form.base_currency.value == 'CUSTOM' %}block{% else %}none{% endif %}; margin-top: 10px;">
-        <input type="text" class="form-control" name="custom_currency" 
-                value="{{ form.custom_currency.value|default:'' }}" 
-                placeholder="Введите код валюты (например: ADA)">
-    </div>
-</div>
 {% endblock %}
 
 {% block indicators_section %}
-<div class="form-section">
-    <h2 class="section-title"><i class="fas fa-chart-line"></i> Индикаторы для входа</h2>
-    <!-- Индикаторы -->
-    <div style="display:none;">
-        {{ formset.management_form }}
-    </div>
-    <div id="indicatorsContainer">
-        {% for form in formset %}
-            {% if not form.DELETE.value %}  <!-- Исключаем удалённые индикаторы -->
-                <div class="indicator-form">
-                    {{ form.id }}
-                    <div class="indicator-row">
-                        <div class="form-group">
-                            <label class="form-label">Индикатор</label>
-                            {{ form.indicator_type }}
+    <div class="indicators-section">
+        <h3>Индикаторы для входа</h3>
+        <div class="indicators-list">
+            {{ formset.management_form }}
+            {% for form in formset %}
+                {% if form.instance.pk or not formset.can_delete %}
+                    <div class="indicator-item">
+                        {{ form.id }}
+                        <div class="indicator-row">
+                            <div class="form-group">
+                                <label>Индикатор</label>
+                                {{ form.indicator_type }}
+                            </div>
+                            <div class="form-group">
+                                <label>Таймфрейм</label>
+                                {{ form.timeframe }}
+                            </div>
                         </div>
-                        <div class="form-group">
-                            <label class="form-label">Таймфрейм</label>
-                            {{ form.timeframe }}
+                        <div class="indicator-row">
+                            <div class="form-group">
+                                <label>Условие</label>
+                                {{ form.condition }}
+                            </div>
+                            <div class="form-group">
+                                <label>Значение</label>
+                                {{ form.value }}
+                            </div>
                         </div>
+                        {% if formset.can_delete %}
+                            <div class="delete-indicator">
+                                <label><input type="checkbox" name="{{ form.DELETE.name }}" id="{{ form.DELETE.id_for_label }}"> Удалить индикатор</label>
+                            </div>
+                        {% endif %}
                     </div>
-                    <div class="indicator-row">
-                        <div class="form-group">
-                            <label class="form-label">Условие</label>
-                            {{ form.condition }}
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Значение</label>
-                            {{ form.value }}
-                        </div>
-                    </div>
-                    <button type="button" class="btn btn-outline" onclick="this.parentNode.remove()">
-                        <i class="fas fa-trash"></i> Удалить индикатор
-                    </button>
-                </div>
-            {% endif %}
-        {% endfor %}
+                {% endif %}
+            {% endfor %}
+        </div>
+        <button type="button" class="add-indicator">Добавить индикатор</button>
     </div>
-    
-    <button type="button" class="btn btn-outline add-indicator-btn" onclick="addIndicator()">
-        <i class="fas fa-plus"></i> Добавить индикатор
-    </button>
-</div>
 {% endblock %}
 
 
 {% block risk_management %}
-<div class="form-section">
-    <h2 class="section-title"><i class="fas fa-shield-alt"></i> Управление рисками</h2>
-    
-    <div class="grid-settings">
-        <div class="grid-setting">
+    <div class="risk-management-section">
+        <h3>Управление рисками</h3>
+        <div class="risk-management-inputs">
             <div class="form-group">
-                <label class="form-label">Take Profit (%)</label>
-                <input type="number" class="form-control" name="take_profit_percent" 
-                       value="{{ form.instance.take_profit_percent|floatformat:1 }}" 
-                       min="0.1" max="100" step="0.1" required>
+                <label for="{{ form.take_profit_percent.id_for_label }}">Take Profit (%)</label>
+                {{ form.take_profit_percent }}
+                {% if form.take_profit_percent.errors %}
+                    <div class="error">{{ form.take_profit_percent.errors }}</div>
+                {% endif %}
             </div>
-        </div>
-        
-        <div class="grid-setting">
             <div class="form-group">
-                <label class="form-label">
+                <label>
+                    <input type="checkbox" id="add-stop-loss" {% if form.stop_loss_percent.value %}checked{% endif %}>
                     Добавить Stop Loss
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="stopLossToggle" {% if form.instance.stop_loss_percent %}checked{% endif %}>
-                        <span class="slider"></span>
-                    </label>
                 </label>
-                <div class="stop-loss-container" id="stopLossContainer" 
-                     style="display: {% if form.instance.stop_loss_percent %}block{% else %}none{% endif %};">
-                    <input type="number" class="form-control" name="stop_loss_percent" id="stopLossValue" 
-                           value="{{ form.instance.stop_loss_percent|floatformat:1|default:'' }}" 
-                           placeholder="2" min="0.1" max="100" step="0.1">
+                <div id="stop-loss-container" {% if not form.stop_loss_percent.value %}style="display: none;"{% endif %}>
+                    <label for="{{ form.stop_loss_percent.id_for_label }}">Stop Loss (%)</label>
+                    {{ form.stop_loss_percent }}
+                    {% if form.stop_loss_percent.errors %}
+                        <div class="error">{{ form.stop_loss_percent.errors }}</div>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
-</div>
 {% endblock %}
+
+
 
 {% block form_actions %}
 <div class="form-actions">
