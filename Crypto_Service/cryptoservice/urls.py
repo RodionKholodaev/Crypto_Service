@@ -19,14 +19,16 @@ from django.urls import path,include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from main.views import help_view
 
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('', include('main.urls')),
     path('analytics/', include('analytics.urls')),
-    path('user/', include('users.urls')),  # Основные маршруты (регистрация, вход, home)
-    path('bots/', include('bots.urls')),  # Все маршруты ботов будут начинаться с /bots/
+    path('user/', include('users.urls')),  
+    path('bots/', include('bots.urls')), 
+    path('help/', help_view, name='help'),
     
 ]+ static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT) # позволяет раздавать медиа файлы во время разработки
 # в продакшене нужно будет настраивать nginx
