@@ -167,7 +167,3 @@ class BotForm(forms.ModelForm):
         return cleaned_data
     
 
-# .save() — сохранение данных
-# пример:
-# obj = form.save()  # Сохраняет в БД
-# obj = form.save(commit=False)  # Возвращает объект, но не сохраняет
