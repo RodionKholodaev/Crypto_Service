@@ -1,0 +1,98 @@
+services:
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_DB: mydb
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d mydb"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  web:
+    build: .
+    command: /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'python manage.py runserver 0.0.0.0:8000'"
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=mydb
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/Crypto_Service
+    cap_add:
+      - SYS_TIME
+
+  celery:
+    build: .
+    command: /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'celery -A cryptoservice worker --loglevel=info'"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=mydb
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/Crypto_Service
+      - broker_connection_retry_on_startup=true
+    cap_add:
+      - SYS_TIME
+  
+
+  celery-beat:
+    build: .
+    command: /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'celery -A cryptoservice beat --loglevel=info'"
+    volumes:
+      - .:/app
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      - POSTGRES_DB=mydb
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - PYTHONPATH=/app:/app/Crypto_Service
+      - broker_connection_retry_on_startup=true
+    cap_add:
+      - SYS_TIME
+
+
+
+
+volumes:
+  postgres_data:
+  redis_data:
