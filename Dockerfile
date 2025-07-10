@@ -9,7 +9,7 @@ ENV PYTHONUNBUFFERED=1
 ENV TZ=UTC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-# Установка зависимостей для PostgreSQL, ntpdate и других утилит
+# Установка зависимостей
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
@@ -18,26 +18,30 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     && rm -rf /var/lib/apt/lists/*
 
-# Создаем пользователя для запуска приложения
+# Создаем пользователя
 RUN useradd -m -u 1000 appuser
 
-# Создаем и переходим в рабочую директорию
+# Рабочая директория
 WORKDIR /app
 
-# Копируем и устанавливаем зависимости
+# Установка зависимостей
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     --index-url https://pypi.org/simple/ \
-    --timeout 100
+    --timeout 100 \
+    gunicorn  # Добавляем Gunicorn
 
-# Копируем весь проект
+# Копируем проект
 COPY . .
 
-# Устанавливаем права на проект
+# Права
 RUN chown -R appuser:appuser /app
 
 # Переходим в папку с manage.py
 WORKDIR /app/Crypto_Service
 
-# Синхронизация времени с помощью ntpdate и запуск приложения
-CMD /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'python manage.py runserver 0.0.0.0:8000'"
+# Собираем статику (будет выполняться при сборке)
+RUN python manage.py collectstatic --noinput
+
+# Запуск через Gunicorn вместо runserver
+CMD /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"

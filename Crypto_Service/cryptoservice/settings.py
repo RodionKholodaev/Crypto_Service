@@ -21,11 +21,13 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 #список доменов с которых можно обращаться к проекту
 #домен - уникальное имя сайта по которому он доступен в интернете
 ALLOWED_HOSTS = ['localhost','127.0.0.1','web']
+
+STATIC_ROOT = '/app/staticfiles' 
 
 
 # список всех приложений + стандартные
@@ -142,9 +144,7 @@ USE_TZ = True
 
 # настройки для CSS, JS и изображений
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    BASE_DIR / "static",
-]
+STATICFILES_DIRS = [BASE_DIR / "static"] 
 
 # настройки для загружаемых файлов
 MEDIA_URL = '/media/' 
