@@ -27,7 +27,7 @@ services:
 
   celery:
     build: .
-    command: /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'celery -A cryptoservice worker --loglevel=info'"
+    command: su appuser -c 'celery -A cryptoservice worker --loglevel=info'
     volumes:
       - .:/app
     depends_on:
@@ -43,13 +43,10 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app:/app/Crypto_Service
       - broker_connection_retry_on_startup=true
-    cap_add:
-      - SYS_TIME
-  
 
   celery-beat:
     build: .
-    command: /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'celery -A cryptoservice beat --loglevel=info'"
+    command: su appuser -c 'celery -A cryptoservice beat --loglevel=info'
     volumes:
       - .:/app
     depends_on:
@@ -65,18 +62,16 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app:/app/Crypto_Service
       - broker_connection_retry_on_startup=true
-    cap_add:
-      - SYS_TIME
 
   web:
     build: .
-    command: /bin/sh -c "ntpdate pool.ntp.org && python manage.py collectstatic --noinput && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"
+    command: /bin/sh -c "python manage.py collectstatic --noinput && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"
     volumes:
       - .:/app
-      - static_volume:/app/staticfiles  # Выносим статику в отдельный volume
-      - media_volume:/app/media    # Выносим медиа в отдельный volume
+      - static_volume:/app/staticfiles
+      - media_volume:/app/media
     expose:
-      - "8000"  # Теперь только expose вместо ports
+      - "8000"
     depends_on:
       db:
         condition: service_healthy
@@ -89,8 +84,6 @@ services:
       - CELERY_BROKER_URL=redis://redis:6379/0
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app:/app/Crypto_Service
-    cap_add:
-      - SYS_TIME
 
   nginx:
     image: nginx:alpine
@@ -103,7 +96,6 @@ services:
       - media_volume:/app/media
     depends_on:
       - web
-
 
 volumes:
   postgres_data:

@@ -13,7 +13,6 @@ RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     gcc \
-    ntpdate \
     curl \
     iputils-ping \
     && rm -rf /var/lib/apt/lists/*
@@ -44,4 +43,4 @@ WORKDIR /app/Crypto_Service
 RUN python manage.py collectstatic --noinput
 
 # Запуск через Gunicorn вместо runserver
-CMD /bin/sh -c "ntpdate pool.ntp.org && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"
+CMD su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'
