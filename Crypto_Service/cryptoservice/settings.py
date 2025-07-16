@@ -25,7 +25,7 @@ DEBUG = False
 
 #список доменов с которых можно обращаться к проекту
 #домен - уникальное имя сайта по которому он доступен в интернете
-ALLOWED_HOSTS = ['localhost','127.0.0.1','web']
+ALLOWED_HOSTS = ['localhost','127.0.0.1','web', '45.8.249.44']
 
 STATIC_ROOT = '/app/staticfiles' 
 
