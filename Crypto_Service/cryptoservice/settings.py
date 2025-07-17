@@ -148,7 +148,7 @@ STATICFILES_DIRS = [BASE_DIR / "static"]
 
 # настройки для загружаемых файлов
 MEDIA_URL = '/media/' 
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = '/app/media'
 
 
 
@@ -178,27 +178,6 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # Email для получения обращений
 SUPPORT_EMAIL = EMAIL_HOST_USER
 
-# было:
-# # Добавить настройки Celery
-# # указываем адрес брокера (redis)
-# CELERY_BROKER_URL = 'redis://redis:6379/0'
-# # указываем где хранить результат работы воркеров
-# CELERY_RESULT_BACKEND = None # сохранения для основой очереди нет
-
-# # настройки для задачи, которая пишет в бд
-# CELERY_RESULT_BACKEND_DB = 'django-db' 
-
-# # какой формат будет принимать воркер
-# CELERY_ACCEPT_CONTENT = ['json']
-# # в какой формат будет сериализована задача
-# CELERY_TASK_SERIALIZER = 'json'
-# # в какой формат будет сериализован результат
-# CELERY_RESULT_SERIALIZER = 'json'
-
-# CELERY_TIMEZONE = 'UTC'
-
-
-# стало:
 # Celery
 CELERY_BROKER_URL = 'redis://redis:6379/0'
 CELERY_RESULT_BACKEND = None #'redis://redis:6379/0'
@@ -206,6 +185,12 @@ CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+# Настройки для устойчивости
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_RETRY = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
+CELERY_TASK_ACKS_LATE = True  # Задачи не будут теряться при перезапуске воркера
 
 # Очереди
 CELERY_TASK_DEFAULT_QUEUE = 'default'

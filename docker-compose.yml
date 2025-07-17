@@ -15,6 +15,7 @@ services:
 
   redis:
     image: redis:7
+    command: redis-server --appendonly yes --save ""
     ports:
       - "6379:6379"
     volumes:
@@ -26,6 +27,7 @@ services:
       retries: 5
 
   celery:
+    restart: unless-stopped
     build: .
     command: su appuser -c 'celery -A cryptoservice worker --loglevel=info'
     volumes:
@@ -40,11 +42,11 @@ services:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app:/app/Crypto_Service
       - broker_connection_retry_on_startup=true
 
   celery-beat:
+    restart: unless-stopped
     build: .
     command: su appuser -c 'celery -A cryptoservice beat --loglevel=info'
     volumes:
@@ -59,7 +61,6 @@ services:
       - POSTGRES_USER=admin
       - POSTGRES_PASSWORD=${DB_PASSWORD}
       - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
       - PYTHONPATH=/app:/app/Crypto_Service
       - broker_connection_retry_on_startup=true
 
