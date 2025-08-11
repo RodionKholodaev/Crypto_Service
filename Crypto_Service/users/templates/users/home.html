@@ -1,11 +1,11 @@
 <!DOCTYPE html>
-<html lang="ru" data-theme="{% if user.theme %}dark{% else %}light{% endif %}"></html>
+{% load static %}
+<html lang="ru" data-theme="{% if user.theme %}dark{% else %}light{% endif %}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Личный кабинет | CryptoBotHub</title>
-    {% load static %}  
-    <link rel="icon" href="{% static 'favicon.png' %}" type="image/png">
+    <link rel="icon" type="image/png" href="{% static 'favicon.png' %}">
 
     <link rel="stylesheet" href="{% static 'users/css/base.css' %}">
     <link rel="stylesheet" href="{% static 'users/css/layout.css' %}">
