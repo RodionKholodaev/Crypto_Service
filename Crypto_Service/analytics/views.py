@@ -2,7 +2,7 @@ from django.shortcuts import render
 from django.core.paginator import Paginator
 from django.db.models import Sum, Count, Q, F
 from django.utils import timezone
-from datetime import timedelta
+from datetime import datetime, timedelta
 from bots.models import Deal, Bot
 from django.db.models.functions import TruncDay
 
@@ -12,22 +12,23 @@ import csv
 import json
 from openpyxl import Workbook
 from io import BytesIO
-from bots.models import Deal
+
+
 
 def dashboard_view(request):
-    # Фильтрация сделок (только закрытые и исполненные)
+    # Базовый queryset: только закрытые и исполненные сделки
     deals = Deal.objects.filter(
         is_active=False,
         is_filled=True,
-        bot__user=request.user  # Только сделки текущего пользователя
+        bot__user=request.user
     ).select_related('bot')
 
-    # 1. Фильтр по времени
-    time_period = request.GET.get('time_period', 'week')
     now = timezone.now()
+    time_period = request.GET.get('time_period', 'week')
 
+    # Фильтр по времени
     if time_period == 'today':
-        start_date = now.replace(hour=0, minute=0, second=0)
+        start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
         deals = deals.filter(created_at__gte=start_date)
     elif time_period == 'week':
         start_date = now - timedelta(days=7)
@@ -39,44 +40,55 @@ def dashboard_view(request):
         date_from = request.GET.get('date_from')
         date_to = request.GET.get('date_to')
         if date_from and date_to:
-            deals = deals.filter(created_at__range=[date_from, date_to])
+            try:
+                start = datetime.strptime(date_from, "%Y-%m-%d")
+                end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
+                deals = deals.filter(created_at__range=[start, end])
+            except ValueError:
+                pass
 
-    # 2. Фильтр по ботам (если выбран)
+    # Фильтр по боту
     bot_filter = request.GET.get('bot_filter')
     if bot_filter and bot_filter != 'all':
         deals = deals.filter(bot_id=bot_filter)
 
-    # 3. Основные метрики
+    # Фильтр по паре
+    pair_filter = request.GET.get('pair_filter')
+    if pair_filter and pair_filter != 'all':
+        deals = deals.filter(trading_pair=pair_filter)
+
+    # Основные метрики
     total_profit = deals.aggregate(Sum('pnl'))['pnl__sum'] or 0
-    total_deposit = Bot.objects.filter(user=request.user).aggregate(Sum('deposit'))['deposit__sum'] or 1
-    profit_percent = (total_profit / total_deposit) * 100
+    total_deposit = Bot.objects.filter(user=request.user).aggregate(Sum('deposit'))['deposit__sum'] or 0
+    profit_percent = (total_profit / total_deposit * 100) if total_deposit > 0 else 0
 
     total_deals = deals.count()
     win_deals = deals.filter(pnl__gt=0).count()
     win_rate = (win_deals / total_deals * 100) if total_deals > 0 else 0
     avg_profit_per_deal = total_profit / total_deals if total_deals > 0 else 0
 
-    # 4. Данные для гистограммы (прибыль по дням)
-    daily_profit = (
+    # Гистограмма
+    daily_profit_qs = (
         deals.annotate(date=TruncDay('created_at'))
         .values('date')
         .annotate(profit=Sum('pnl'))
         .order_by('date')
     )
+    daily_profit_labels = [dp['date'].strftime('%Y-%m-%d') for dp in daily_profit_qs]
+    daily_profit_values = [float(dp['profit']) for dp in daily_profit_qs]
 
-    # 5. Данные для круговой диаграммы (распределение PnL)
+    # Круговая диаграмма
     profit_loss_data = {
-        'profit': deals.filter(pnl__gt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0,
-        'loss': abs(deals.filter(pnl__lt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0),
-        'commission': deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0,
+        'profit': float(deals.filter(pnl__gt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0),
+        'loss': abs(float(deals.filter(pnl__lt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0)),
+        'commission': float(deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0),
     }
 
-    # 6. Таблица сделок (с пагинацией)
+    # Пагинация
     paginator = Paginator(deals.order_by('-created_at'), 20)
     page_number = request.GET.get('page')
     deals_page = paginator.get_page(page_number)
 
-    # 7. Списки для фильтров
     user_bots = Bot.objects.filter(user=request.user)
     trading_pairs = deals.values_list('trading_pair', flat=True).distinct()
 
@@ -87,13 +99,17 @@ def dashboard_view(request):
         'total_deals': total_deals,
         'win_rate': win_rate,
         'avg_profit_per_deal': avg_profit_per_deal,
-        'daily_profit': list(daily_profit),
+        'daily_profit_labels': daily_profit_labels,
+        'daily_profit_values': daily_profit_values,
         'profit_loss_data': profit_loss_data,
         'user_bots': user_bots,
         'trading_pairs': trading_pairs,
         'time_period': time_period,
+        'date_from': request.GET.get('date_from', ''),
+        'date_to': request.GET.get('date_to', ''),
     }
     return render(request, 'analytics/dashboard.html', context)
+
 
 # скачивание данных
 class ExportDealsView(View):

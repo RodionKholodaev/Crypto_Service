@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Статистика торговых ботов</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/chart.js">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
     <style>
         :root {
             --primary: #6c5ce7;
@@ -492,13 +493,11 @@
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: {{ daily_profit|safe }},
+                    labels: {{ daily_profit_labels|safe }},
                     datasets: [{
                         label: 'Прибыль ($)',
-                        data: {{ daily_profit|safe }},
-                        backgroundColor: (ctx) => {
-                            return ctx.raw >= 0 ? '#00b894' : '#d63031';
-                        },
+                        data: {{ daily_profit_values|safe }},
+                        backgroundColor: {{ daily_profit_values|safe }}.map(v => v >= 0 ? '#00b894' : '#d63031'),
                         borderRadius: 4,
                     }]
                 },
