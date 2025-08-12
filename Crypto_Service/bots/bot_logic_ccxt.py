@@ -95,6 +95,56 @@ class TradingBot:
         except Exception as e:
             logger.error(f"Ошибка отправки уведомления администратору: {e}")
 
+    
+    async def send_trade_notification(self, event_type, deal=None, indicators_data=None):
+        """Отправка уведомления о входе/выходе из сделки"""
+        try:
+            bot_name = await sync_to_async(lambda: self.bot.name)()
+            user = await sync_to_async(lambda: self.bot.user)()
+            trading_pair = await sync_to_async(lambda: self.bot.trading_pair)()
+            trading_pair_formatted = f"{trading_pair[:-4]}/{trading_pair[-4:]}:USDT"
+
+            if event_type == "entry":
+                subject = f"Бот {bot_name} вошёл в сделку"
+                message = (
+                    f"Вход в сделку:\n"
+                    f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"Пользователь: {user.email}\n"
+                    f"Торговая пара: {trading_pair_formatted}\n"
+                    f"Цена входа: {deal.entry_price}\n"
+                    f"Объем: {deal.volume}\n"
+                    f"Индикаторы на момент входа:\n"
+                )
+                for ind_name, value in indicators_data.items():
+                    message += f"- {ind_name}: {value:.2f}\n"
+
+            elif event_type == "exit":
+                subject = f"Бот {bot_name} вышел из сделки"
+                message = (
+                    f"Выход из сделки:\n"
+                    f"Время: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                    f"Пользователь: {user.email}\n"
+                    f"Торговая пара: {trading_pair_formatted}\n"
+                    f"Цена выхода: {deal.exit_price if hasattr(deal, 'exit_price') else 'N/A'}\n"
+                    f"PNL: {deal.pnl:.2f} USDT\n"
+                    f"Комиссия биржи: {deal.exchange_commission:.4f} USDT\n"
+                    f"Комиссия сервиса: {deal.service_commission:.2f} USDT\n"
+                    f"Итог: {deal.pnl - deal.service_commission:.2f} USDT"
+                )
+
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=None,
+                recipient_list=[settings.ADMIN_EMAIL],
+                fail_silently=True,
+            )
+            logger.info(f"Уведомление о {event_type} отправлено")
+        except Exception as e:
+            logger.error(f"Ошибка отправки уведомления о сделке: {e}")
+
+
+
     async def check_time_sync(self):
         """Проверка синхронизации времени с сервером биржи."""
         try:
@@ -389,6 +439,25 @@ class TradingBot:
             )
             logger.info(f"Рыночный ордер размещен: {order_id}, объем: {order_qty}")
 
+
+
+            # сообщение на почту админа (не проверенный код)
+            indicators_data = {}
+            indicators = await sync_to_async(lambda: list(self.bot.indicators.all()))()
+            for indicator in indicators:
+                ind_type = await sync_to_async(lambda: indicator.indicator_type)()
+                if ind_type == "RSI":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    rsi = RSIIndicator(close=df['close'], window=14).rsi()
+                    indicators_data["RSI"] = rsi.iloc[-1]
+                elif ind_type == "CCI":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    cci = CCIIndicator(high=df['high'], low=df['low'], close=df['close'], window=20).cci()
+                    indicators_data["CCI"] = cci.iloc[-1]
+
+            await self.send_trade_notification("entry", deal, indicators_data)
+
+
             price_step = current_price * (grid_overlap_percent / 100) / (grid_orders_count - 1)
             for i in range(1, grid_orders_count):
                 limit_price = current_price - price_step * i if strategy else current_price + price_step * i
@@ -433,19 +502,6 @@ class TradingBot:
                         stop_loss_price=limit_price * (1 + stop_loss_percent / 100)
                 else:
                     stop_loss_price=None
-
-                # await sync_to_async(Deal.objects.create)(
-                #     bot=self.bot,
-                #     entry_price=limit_price,
-                #     take_profit_price=limit_price * (1 + take_profit_percent / 100) if strategy else limit_price * (1 - take_profit_percent / 100),
-                #     stop_loss_price=stop_loss_price,
-                #     exchange_commission=0.0,
-                #     service_commission=0.0,
-                #     volume=order_qty,
-                #     pnl=0.0,
-                #     trading_pair=trading_pair,
-                #     order_id=limit_order['id']
-                # )
 
                 await sync_to_async(Deal.objects.create)(
                     bot=self.bot,
@@ -579,7 +635,13 @@ class TradingBot:
                         deal.service_commission = max(0, pnl * 0.1)
                         deal.is_active = False
                         deal.is_filled = True
+
+
+                        # уведомление админу
+                        deal.exit_price = current_price 
                         await sync_to_async(deal.save)()
+                        await self.send_trade_notification("exit", deal)
+
 
                         if deal.service_commission > 0:
                             user = await sync_to_async(lambda: self.bot.user)()

@@ -106,6 +106,7 @@ class Deal(models.Model):
     trading_pair=models.CharField(max_length=30)
     order_id = models.CharField(max_length=100, null=True, blank=True)  # ID ордера на Bybit
     is_filled = models.BooleanField(default=False) # для лимитных ордеров
+    exit_price = models.DecimalField(max_digits=20, decimal_places=8, null=True) # цена выхода
 
 
 
