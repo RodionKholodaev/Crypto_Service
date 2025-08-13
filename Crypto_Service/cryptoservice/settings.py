@@ -180,11 +180,13 @@ SUPPORT_EMAIL = EMAIL_HOST_USER
 
 # Celery
 CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = None #'redis://redis:6379/0'
+CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
 CELERY_RESULT_SERIALIZER = 'json'
 CELERY_TIMEZONE = 'UTC'
+
+CELERY_TASK_TRACK_STARTED = True
 
 # Настройки для устойчивости
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
@@ -196,6 +198,7 @@ CELERY_TASK_ACKS_LATE = True  # Задачи не будут теряться п
 CELERY_TASK_DEFAULT_QUEUE = 'default'
 CELERY_TASK_ROUTES = {
     'bots.tasks.check_payments': {'queue': 'payments'},
+    'bots.tasks.run_trading_bot': {'queue': 'trading'},
 }
 
 # Расписание

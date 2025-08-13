@@ -17,17 +17,31 @@ from .models import CryptoTransaction
 # создает задачу для celery
 # shared_task дает использовать функцию run_trading_bot как celery task
 @shared_task(
-        name="run_trading_bot_{bot_id}",
-        ignore_result=True,  # Не сохранять результат
-        queue="default",    # Очередь без бэкенда
-        )
-def run_trading_bot(bot_id):
+    name="run_trading_bot_{bot_id}",
+    queue="trading",  # Должно соответствовать CELERY_TASK_ROUTES
+    bind=True,  # Для доступа к self (task.request и др.)
+    autoretry_for=(Exception,),  # Автоповтор при ошибках
+    retry_kwargs={'max_retries': 3, 'countdown': 10},
+)
+def run_trading_bot(self, bot_id):
+    from bots.models import Bot
+    from django.db import close_old_connections
+    
+    close_old_connections()
+    bot = Bot.objects.filter(id=bot_id).first()
+    
+    if not bot or not bot.is_active:
+        return  # Прекращаем если бот не активен
+    
     loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop) 
+    asyncio.set_event_loop(loop)
     try:
         loop.run_until_complete(start_bot(bot_id))
+    except Exception as e:
+        self.retry(exc=e)  # Повторяем при ошибке
     finally:
         loop.close()
+        close_old_connections()
 
 
 

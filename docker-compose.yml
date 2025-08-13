@@ -29,7 +29,7 @@ services:
   celery:
     restart: unless-stopped
     build: .
-    command: su appuser -c 'celery -A cryptoservice worker --loglevel=info'
+    command: su appuser -c 'celery -A cryptoservice worker --loglevel=info -Q payments,trading,default'
     volumes:
       - .:/app
     depends_on:
