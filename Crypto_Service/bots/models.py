@@ -93,7 +93,13 @@ class Indicator(models.Model):
 
 # информация по сделкам 
 class Deal(models.Model):
-    bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='deals')
+    bot = models.ForeignKey(
+        Bot, 
+        on_delete=models.SET_NULL,  # При удалении бота поле станет NULL
+        null=True,                  # Разрешает NULL
+        blank=True,                 # Разрешает пустое значение в формах
+        related_name='deals'
+    )
     entry_price = models.DecimalField(max_digits=20, decimal_places=8)
     take_profit_price = models.DecimalField(max_digits=20, decimal_places=8)
     stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8,null=True)
