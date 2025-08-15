@@ -27,6 +27,17 @@ DEBUG = False
 #домен - уникальное имя сайта по которому он доступен в интернете
 ALLOWED_HOSTS = ['localhost','127.0.0.1','web', '45.8.249.44', 'cryptobot-hub.ru', 'cryptobot-hub.online']
 
+# Trust headers from Nginx reverse proxy and enforce HTTPS in Django
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+USE_X_FORWARDED_HOST = True
+CSRF_TRUSTED_ORIGINS = [
+    'https://cryptobot-hub.ru',
+    'https://cryptobot-hub.online',
+]
+
 STATIC_ROOT = '/app/staticfiles' 
 
 
