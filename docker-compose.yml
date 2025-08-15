@@ -106,7 +106,7 @@ services:
     depends_on:
       nginx:
         condition: service_started
-    command: sh -c "certbot certonly --webroot --webroot-path=/var/www/certbot --email ${LETSENCRYPT_EMAIL:-kholodaev10e@mail.ru} --agree-tos --no-eff-email --rsa-key-size 4096 --keep-until-expiring --non-interactive -d cryptobot-hub.ru -d cryptobot-hub.online"
+    command: certonly --webroot --webroot-path=/var/www/certbot --email ${LETSENCRYPT_EMAIL:-kholodaev10e@mail.ru} --agree-tos --no-eff-email --rsa-key-size 4096 --keep-until-expiring --non-interactive -d cryptobot-hub.ru -d cryptobot-hub.online
 
   nginx_ssl:
     image: nginx:alpine
