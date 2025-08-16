@@ -85,6 +85,27 @@
                                 </span>
                             </div>
                         </div>
+                        
+                        <!-- Отображение ошибок бота -->
+                        {% if bot.last_error %}
+                        <div class="bot-error">
+                            <div class="error-header">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                <span class="error-title">Ошибка в работе бота</span>
+                                {% if bot.error_time_ago %}
+                                <span class="error-time">{{ bot.error_time_ago }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="error-message">
+                                {{ bot.last_error }}
+                            </div>
+                            <div class="error-actions">
+                                <button class="btn-error-action" onclick="retryBot({{ bot.id }})" title="Попробовать снова">
+                                    <i class="fas fa-redo"></i> Повторить
+                                </button>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                     
                     <div class="bot-actions">
@@ -147,6 +168,39 @@
     <!-- Подтверждение удаления и другие скрипты -->
     <script>
 
+
+        // Функция для повторного запуска бота при ошибке
+        function retryBot(botId) {
+            if (confirm("Попробовать запустить бота снова?")) {
+                const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+                if (!csrfToken) {
+                    alert("Ошибка безопасности: CSRF-токен не найден.");
+                    return;
+                }
+
+                fetch(`/bots/bots/${botId}/retry/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': csrfToken,
+                        'Content-Type': 'application/json',
+                    },
+                })
+                .then(response => {
+                    if (!response.ok) throw new Error('Ошибка сервера');
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.status === 'success') {
+                        location.reload();
+                    } else {
+                        alert(data.message || 'Ошибка при повторном запуске бота');
+                    }
+                })
+                .catch(error => {
+                    alert('Ошибка: ' + error.message);
+                });
+            }
+        }
 
         // В шаблоне my_bots.html обновите функцию confirmDelete
         function confirmDelete(botId) {

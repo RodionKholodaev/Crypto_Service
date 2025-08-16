@@ -87,6 +87,25 @@ def my_bots(request):
             bot.roi = (bot.net_profit / bot.deposit) * 100
         else:
             bot.roi = 0
+        
+        # Форматируем время ошибки для отображения
+        if bot.error_timestamp:
+            from django.utils import timezone
+            now = timezone.now()
+            time_diff = now - bot.error_timestamp
+            
+            if time_diff.days > 0:
+                bot.error_time_ago = f"{time_diff.days} дн. назад"
+            elif time_diff.seconds > 3600:
+                hours = time_diff.seconds // 3600
+                bot.error_time_ago = f"{hours} ч. назад"
+            elif time_diff.seconds > 60:
+                minutes = time_diff.seconds // 60
+                bot.error_time_ago = f"{minutes} мин. назад"
+            else:
+                bot.error_time_ago = "только что"
+        else:
+            bot.error_time_ago = None
     
     # Сортировка
     sort_by = request.GET.get('sort', 'name_asc')
@@ -147,6 +166,33 @@ def toggle_bot(request, bot_id):
             print (f"ошибка при попытке отменить задачу: {e}")
     
     return JsonResponse({'status': 'success'})
+
+
+@require_POST
+@login_required
+def retry_bot(request, bot_id):
+    """Повторный запуск бота при ошибке."""
+    try:
+        bot = get_object_or_404(Bot, id=bot_id, user=request.user)
+        
+        # Очищаем ошибку
+        bot.last_error = None
+        bot.error_timestamp = None
+        bot.save()
+        
+        # Запускаем бота заново
+        run_trading_bot.apply_async(
+            args=[bot.id], 
+            task_id=f"run_trading_bot_{bot.id}",
+            queue='trading'
+        )
+        
+        return JsonResponse({'status': 'success', 'message': 'Бот перезапущен'})
+    except Exception as e:
+        return JsonResponse(
+            {'status': 'error', 'message': f'Ошибка при перезапуске: {str(e)}'},
+            status=500
+        )
 
 def bot_details(request, bot_id):
     bot = get_object_or_404(Bot, id=bot_id, user=request.user)

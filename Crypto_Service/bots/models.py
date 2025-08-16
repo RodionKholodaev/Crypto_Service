@@ -71,6 +71,10 @@ class Bot(models.Model):
 
     is_active=models.BooleanField(default=True)
 
+    # Поле для хранения последней ошибки бота
+    last_error = models.TextField(blank=True, null=True, help_text="Последняя ошибка, возникшая в работе бота")
+    error_timestamp = models.DateTimeField(blank=True, null=True, help_text="Время возникновения ошибки")
+
     
 
 

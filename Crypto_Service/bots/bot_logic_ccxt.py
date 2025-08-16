@@ -67,15 +67,25 @@ class TradingBot:
 
             self.running = await sync_to_async(lambda: self.bot.is_active)()
             logger.info(f"Бот ID: {self.bot_id} инициализирован, is_active: {self.running}")
+            # Очищаем предыдущие ошибки при успешной инициализации
+            if self.bot.last_error:
+                await sync_to_async(lambda: setattr(self.bot, 'last_error', None))()
+                await sync_to_async(lambda: setattr(self.bot, 'error_timestamp', None))()
+                await sync_to_async(self.bot.save)()
+                logger.info(f"Ошибки очищены для бота {self.bot_id}")
             self.notified = False  # Сбрасываем флаг уведомлений
         except Bot.DoesNotExist:
+            error_msg = "Бот не найден в базе данных"
             logger.error(f"Бот с ID {self.bot_id} не найден")
+            await self.save_error(error_msg, "not_found")
             if not self.notified:
                 await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
                 self.notified = True
             self.running = False
         except Exception as e:
+            error_msg = self.translate_error(str(e))
             logger.error(f"Ошибка инициализации бота {self.bot_id}: {e}", exc_info=True)
+            await self.save_error(error_msg, "initialization")
             if not self.notified:
                 await sync_to_async(self.notify_admin)(f"Ошибка инициализации бота {self.bot_id}: {str(e)}")
                 self.notified = True
@@ -660,14 +670,18 @@ class TradingBot:
 
                 await asyncio.sleep(10)
             except Bot.DoesNotExist:
+                error_msg = "Бот не найден в базе данных"
                 logger.error(f"Бот с ID {self.bot_id} не найден")
+                await self.save_error(error_msg, "not_found")
                 if not self.notified:
                     await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
                     self.notified = True
                 self.running = False
                 return
             except Exception as e:
+                error_msg = self.translate_error(str(e))
                 logger.error(f"Ошибка при мониторинге ордеров для бота {bot_name}: {e}", exc_info=True)
+                await self.save_error(error_msg, "monitoring")
                 if not self.notified:
                     await sync_to_async(self.notify_admin)(f"Ошибка при мониторинге ордеров для бота {self.bot_id}: {str(e)}")
                     self.notified = True
@@ -725,13 +739,17 @@ class TradingBot:
 
                 await asyncio.sleep(10)
         except Bot.DoesNotExist:
+            error_msg = "Бот не найден в базе данных"
             logger.error(f"Бот с ID {self.bot_id} не найден")
+            await self.save_error(error_msg, "not_found")
             if not self.notified:
                 await sync_to_async(self.notify_admin)(f"Ошибка: Бот с ID {self.bot_id} не найден")
                 self.notified = True
             self.running = False
         except Exception as e:
+            error_msg = self.translate_error(str(e))
             logger.error(f"Ошибка в цикле бота {self.bot_id}: {e}", exc_info=True)
+            await self.save_error(error_msg, "runtime")
             if not self.notified:
                 await sync_to_async(self.notify_admin)(f"Ошибка в цикле бота {self.bot_id}: {str(e)}")
                 self.notified = True
@@ -739,6 +757,43 @@ class TradingBot:
         finally:
             if self.client:
                 await self.client.close()
+
+    async def save_error(self, error_message, error_type="general"):
+        """Сохранение ошибки в базу данных."""
+        try:
+            from django.utils import timezone
+            await sync_to_async(lambda: setattr(self.bot, 'last_error', error_message))()
+            await sync_to_async(lambda: setattr(self.bot, 'error_timestamp', timezone.now()))()
+            await sync_to_async(self.bot.save)()
+            logger.info(f"Ошибка сохранена в БД для бота {self.bot_id}: {error_message}")
+        except Exception as e:
+            logger.error(f"Не удалось сохранить ошибку в БД: {e}")
+
+    def translate_error(self, error_message):
+        """Перевод технических ошибок в понятные пользователю сообщения."""
+        error_lower = error_message.lower()
+        
+        # Ошибки подключения к бирже
+        if 'timeout' in error_lower or 'connection' in error_lower:
+            return "Проблема с подключением к бирже. Проверьте интернет-соединение."
+        elif 'rate limit' in error_lower or 'too many requests' in error_lower:
+            return "Слишком много запросов к бирже. Попробуйте позже."
+        elif 'invalid api' in error_lower or 'api key' in error_lower:
+            return "Неверные API ключи. Проверьте настройки аккаунта."
+        elif 'insufficient balance' in error_lower or 'balance' in error_lower:
+            return "Недостаточно средств на балансе для выполнения операции."
+        elif 'symbol not found' in error_lower or 'trading pair' in error_lower:
+            return "Торговая пара не найдена на бирже."
+        elif 'order not found' in error_lower:
+            return "Ордер не найден на бирже."
+        elif 'market closed' in error_lower:
+            return "Рынок закрыт для торговли."
+        elif 'maintenance' in error_lower:
+            return "Биржа находится на техническом обслуживании."
+        elif 'network' in error_lower:
+            return "Проблема с сетью. Попробуйте позже."
+        else:
+            return "Произошла ошибка в работе бота. Попробуйте перезапустить."
 
     # безопасное получение данных по ордерам
     async def safe_fetch_order(self, order_id, symbol):

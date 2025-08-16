@@ -7,5 +7,6 @@ urlpatterns = [
     path('my-bots/', views.my_bots, name='my_bots'),
     path('bots/<int:bot_id>/delete/', views.delete_bot, name='delete_bot'),
     path('bots/<int:bot_id>/toggle/', views.toggle_bot, name='toggle_bot'),  
+    path('bots/<int:bot_id>/retry/', views.retry_bot, name='retry_bot'),
     path('bots/details/<int:bot_id>/', views.bot_details, name='bot_details'),  
 ]
