@@ -21,7 +21,7 @@ def dashboard_view(request):
         is_active=False,
         is_filled=True,
         bot__user=request.user
-    ).select_related('bot')
+    ).select_related('bot').exclude(pnl=0)  # Исключаем сделки с нулевым PnL
 
     now = timezone.now()
     time_period = request.GET.get('time_period', 'week')
@@ -74,8 +74,14 @@ def dashboard_view(request):
         .annotate(profit=Sum('pnl'))
         .order_by('date')
     )
-    daily_profit_labels = [dp['date'].strftime('%Y-%m-%d') for dp in daily_profit_qs]
-    daily_profit_values = [float(dp['profit']) for dp in daily_profit_qs]
+    
+    # Проверяем, что есть данные для графика
+    if daily_profit_qs.exists():
+        daily_profit_labels = [dp['date'].strftime('%Y-%m-%d') for dp in daily_profit_qs]
+        daily_profit_values = [float(dp['profit']) for dp in daily_profit_qs]
+    else:
+        daily_profit_labels = []
+        daily_profit_values = []
 
     # Круговая диаграмма
     profit_loss_data = {
@@ -83,6 +89,10 @@ def dashboard_view(request):
         'loss': abs(float(deals.filter(pnl__lt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0)),
         'commission': float(deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0),
     }
+    
+    # Проверяем, что есть данные для круговой диаграммы
+    if not any([profit_loss_data['profit'], profit_loss_data['loss'], profit_loss_data['commission']]):
+        profit_loss_data = {'profit': 0, 'loss': 0, 'commission': 0}
 
     # Пагинация
     paginator = Paginator(deals.order_by('-created_at'), 20)
@@ -151,6 +161,7 @@ class ExportDealsView(View):
             'entry_price',
             'take_profit_price',
             'stop_loss_price',
+            'exit_price',
             'pnl',
             'exchange_commission',
             'service_commission',
@@ -179,7 +190,7 @@ class ExportDealsView(View):
         # Заголовки
         headers = [
             'Date', 'Bot Name', 'Trading Pair', 'Volume', 
-            'Entry Price', 'Take Profit', 'Stop Loss', 'PNL',
+            'Entry Price', 'Take Profit', 'Stop Loss', 'Exit Price', 'PNL',
             'Exchange Commission', 'Service Commission', 'Order ID', 'Is Filled'
         ]
         writer.writerow(headers)
@@ -194,6 +205,7 @@ class ExportDealsView(View):
                 str(deal['entry_price']).replace('.', ','),
                 str(deal['take_profit_price']).replace('.', ','),
                 str(deal['stop_loss_price']).replace('.', ',') if deal['stop_loss_price'] else '',
+                str(deal['exit_price']).replace('.', ',') if deal['exit_price'] else '',
                 str(deal['pnl']).replace('.', ','),
                 str(deal['exchange_commission']).replace('.', ','),
                 str(deal['service_commission']).replace('.', ','),
@@ -208,6 +220,9 @@ class ExportDealsView(View):
         for item in data:
             item['created_at'] = item['created_at'].strftime('%Y-%m-%d %H:%M:%S')
             item['is_filled'] = 'Yes' if item['is_filled'] else 'No'
+            # Добавляем поле exit_price если его нет
+            if 'exit_price' not in item:
+                item['exit_price'] = None
         
         response = JsonResponse(data, safe=False)
         response['Content-Disposition'] = 'attachment; filename="deals_export.json"'
@@ -221,7 +236,7 @@ class ExportDealsView(View):
         # Заголовки
         ws.append([
             'Date', 'Bot Name', 'Trading Pair', 'Volume', 'Entry Price', 
-            'Take Profit', 'Stop Loss', 'PNL', 'Exchange Commission', 
+            'Take Profit', 'Stop Loss', 'Exit Price', 'PNL', 'Exchange Commission', 
             'Service Commission', 'Order ID', 'Is Filled'
         ])
         
@@ -235,6 +250,7 @@ class ExportDealsView(View):
                 float(deal['entry_price']),
                 float(deal['take_profit_price']),
                 float(deal['stop_loss_price']) if deal['stop_loss_price'] else None,
+                float(deal['exit_price']) if deal['exit_price'] else None,
                 float(deal['pnl']),
                 float(deal['exchange_commission']),
                 float(deal['service_commission']),

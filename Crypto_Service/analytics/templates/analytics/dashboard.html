@@ -195,6 +195,11 @@
             color: var(--danger);
         }
 
+        .badge-warning {
+            background: rgba(253, 203, 110, 0.1);
+            color: var(--warning);
+        }
+
         .pagination {
             display: flex;
             justify-content: center;
@@ -383,7 +388,7 @@
                     </div>
                 </div>
                 <div class="chart-container">
-                    {% if daily_profit %}
+                    {% if daily_profit_labels %}
                         <canvas id="profit-chart"></canvas>
                     {% else %}
                         <div class="empty-state">
@@ -399,7 +404,7 @@
                     <h2 class="card-title">Распределение</h2>
                 </div>
                 <div class="chart-container">
-                    {% if profit_loss_data.profit > 0 or profit_loss_data.loss > 0 %}
+                    {% if profit_loss_data.profit > 0 or profit_loss_data.loss > 0 or profit_loss_data.commission > 0 %}
                         <canvas id="distribution-chart"></canvas>
                     {% else %}
                         <div class="empty-state">
@@ -426,28 +431,38 @@
                                     <th>Пара</th>
                                     <th>Тип</th>
                                     <th>Объем</th>
-                                    <th>Цена</th>
+                                    <th>Цена входа</th>
                                     <th>Прибыль</th>
-                                    <th>Комиссия</th>
+                                    <th>Комиссия биржи</th>
+                                    <th>Цена выхода</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {% for deal in deals %}
                                     <tr>
-                                        <td>{{ deal.created_at|date:"Y-m-d H:i" }}</td>
-                                        <td>{{ deal.bot.name }}</td>
-                                        <td>{{ deal.trading_pair }}</td>
+                                        <td>{% if deal.created_at %}{{ deal.created_at|date:"Y-m-d H:i" }}{% else %}N/A{% endif %}</td>
+                                        <td>{% if deal.bot %}{{ deal.bot.name }}{% else %}N/A{% endif %}</td>
+                                        <td>{% if deal.trading_pair %}{{ deal.trading_pair }}{% else %}N/A{% endif %}</td>
                                         <td>
-                                            <span class="badge {% if deal.type == 'LONG' %}badge-success{% else %}badge-danger{% endif %}">
-                                                {{ deal.type }}
-                                            </span>
+                                            {% if deal.bot and deal.bot.strategy is not None %}
+                                                <span class="badge {% if deal.bot.strategy %}badge-success{% else %}badge-danger{% endif %}">
+                                                    {% if deal.bot.strategy %}LONG{% else %}SHORT{% endif %}
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-warning">UNKNOWN</span>
+                                            {% endif %}
                                         </td>
-                                        <td>{{ deal.volume }}</td>
-                                        <td>${{ deal.price|floatformat:2 }}</td>
-                                        <td class="{% if deal.pnl >= 0 %}profit{% else %}loss{% endif %}">
-                                            {% if deal.pnl >= 0 %}+{% endif %}${{ deal.pnl|floatformat:2 }}
+                                        <td>{% if deal.volume %}{{ deal.volume|floatformat:4 }}{% else %}N/A{% endif %}</td>
+                                        <td>{% if deal.entry_price %}${{ deal.entry_price|floatformat:8 }}{% else %}N/A{% endif %}</td>
+                                        <td class="{% if deal.pnl and deal.pnl >= 0 %}profit{% elif deal.pnl and deal.pnl < 0 %}loss{% endif %}">
+                                            {% if deal.pnl %}
+                                                {% if deal.pnl >= 0 %}+{% endif %}${{ deal.pnl|floatformat:2 }}
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
                                         </td>
-                                        <td>${{ deal.exchange_commission|floatformat:2 }}</td>
+                                        <td>{% if deal.exchange_commission %}${{ deal.exchange_commission|floatformat:4 }}{% else %}N/A{% endif %}</td>
+                                        <td>{% if deal.exit_price %}${{ deal.exit_price|floatformat:8 }}{% else %}N/A{% endif %}</td>
                                     </tr>
                                 {% endfor %}
                             </tbody>
@@ -480,27 +495,39 @@
     <script>
         // Инициализация графиков
         document.addEventListener('DOMContentLoaded', function() {
-            {% if daily_profit %}
-                initProfitChart();
-            {% endif %}
-            
-            {% if profit_loss_data.profit > 0 or profit_loss_data.loss > 0 %}
-                initDistributionChart();
-            {% endif %}
+            try {
+                {% if daily_profit_labels %}
+                    initProfitChart();
+                {% endif %}
+                
+                {% if profit_loss_data.profit > 0 or profit_loss_data.loss > 0 or profit_loss_data.commission > 0 %}
+                    initDistributionChart();
+                {% endif %}
+            } catch (error) {
+                console.error('Ошибка при инициализации графиков:', error);
+            }
             
             setupEventListeners();
         });
 
         function initProfitChart() {
             const ctx = document.getElementById('profit-chart').getContext('2d');
+            const labels = {{ daily_profit_labels|safe }};
+            const values = {{ daily_profit_values|safe }};
+            
+            if (!labels || !values || labels.length === 0 || values.length === 0) {
+                console.warn('Нет данных для графика прибыли');
+                return;
+            }
+            
             new Chart(ctx, {
                 type: 'bar',
                 data: {
-                    labels: {{ daily_profit_labels|safe }},
+                    labels: labels,
                     datasets: [{
                         label: 'Прибыль ($)',
-                        data: {{ daily_profit_values|safe }},
-                        backgroundColor: {{ daily_profit_values|safe }}.map(v => v >= 0 ? '#00b894' : '#d63031'),
+                        data: values,
+                        backgroundColor: values.map(v => v >= 0 ? '#00b894' : '#d63031'),
                         borderRadius: 4,
                     }]
                 },
@@ -518,16 +545,21 @@
 
         function initDistributionChart() {
             const ctx = document.getElementById('distribution-chart').getContext('2d');
+            const profit = {{ profit_loss_data.profit|default:0 }};
+            const loss = {{ profit_loss_data.loss|default:0 }};
+            const commission = {{ profit_loss_data.commission|default:0 }};
+            
+            if (!profit && !loss && !commission) {
+                console.warn('Нет данных для круговой диаграммы');
+                return;
+            }
+            
             new Chart(ctx, {
                 type: 'doughnut',
                 data: {
                     labels: ['Прибыль', 'Убыток', 'Комиссии'],
                     datasets: [{
-                        data: [
-                            {{ profit_loss_data.profit|default:0 }},
-                            {{ profit_loss_data.loss|default:0 }},
-                            {{ profit_loss_data.commission|default:0 }}
-                        ],
+                        data: [profit, loss, commission],
                         backgroundColor: ['#00b894', '#d63031', '#0984e3'],
                         borderWidth: 0,
                     }]
@@ -546,104 +578,144 @@
         }
 
         function setupEventListeners() {
-            // Показать/скрыть кастомные даты
-            document.getElementById('time-period').addEventListener('change', function() {
-                const customDates = document.getElementById('custom-dates');
-                const customDatesTo = document.getElementById('custom-dates-to');
-                if (this.value === 'custom') {
-                    customDates.style.display = 'block';
-                    customDatesTo.style.display = 'block';
-                } else {
-                    customDates.style.display = 'none';
-                    customDatesTo.style.display = 'none';
+            try {
+                // Показать/скрыть кастомные даты
+                const timePeriodSelect = document.getElementById('time-period');
+                if (timePeriodSelect) {
+                    timePeriodSelect.addEventListener('change', function() {
+                        const customDates = document.getElementById('custom-dates');
+                        const customDatesTo = document.getElementById('custom-dates-to');
+                        if (this.value === 'custom') {
+                            customDates.style.display = 'block';
+                            customDatesTo.style.display = 'block';
+                        } else {
+                            customDates.style.display = 'none';
+                            customDatesTo.style.display = 'none';
+                        }
+                    });
                 }
-            });
 
-            // Кнопка применения фильтров
-            document.getElementById('apply-filters').addEventListener('click', function() {
+                // Кнопка применения фильтров
+                const applyFiltersBtn = document.getElementById('apply-filters');
+                if (applyFiltersBtn) {
+                    applyFiltersBtn.addEventListener('click', function() {
+                        const params = new URLSearchParams();
+                        
+                        // Период
+                        const timePeriod = document.getElementById('time-period').value;
+                        params.set('time_period', timePeriod);
+                        
+                        if (timePeriod === 'custom') {
+                            const dateFrom = document.getElementById('date-from').value;
+                            const dateTo = document.getElementById('date-to').value;
+                            if (dateFrom && dateTo) {
+                                params.set('date_from', dateFrom);
+                                params.set('date_to', dateTo);
+                            }
+                        }
+                        
+                        // Бот
+                        const botFilter = document.getElementById('bot-filter').value;
+                        if (botFilter !== 'all') {
+                            params.set('bot_filter', botFilter);
+                        }
+                        
+                        // Торговая пара
+                        const pairFilter = document.getElementById('pair-filter').value;
+                        if (pairFilter !== 'all') {
+                            params.set('pair_filter', pairFilter);
+                        }
+                        
+                        // Перезагружаем страницу с новыми параметрами
+                        window.location.search = params.toString();
+                    });
+                }
+
+                // Кнопка обновления
+                const refreshTradesBtn = document.getElementById('refresh-trades');
+                if (refreshTradesBtn) {
+                    refreshTradesBtn.addEventListener('click', function() {
+                        window.location.reload();
+                    });
+                }
+            } catch (error) {
+                console.error('Ошибка при настройке обработчиков событий:', error);
+            }
+        }
+        // Кнопки экспорта
+        try {
+            const exportCsvBtn = document.getElementById('export-csv');
+            if (exportCsvBtn) {
+                exportCsvBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    exportData('csv');
+                });
+            }
+
+            const exportJsonBtn = document.getElementById('export-json');
+            if (exportJsonBtn) {
+                exportJsonBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    exportData('json');
+                });
+            }
+
+            const exportExcelBtn = document.getElementById('export-excel');
+            if (exportExcelBtn) {
+                exportExcelBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    exportData('excel');
+                });
+            }
+        } catch (error) {
+            console.error('Ошибка при настройке кнопок экспорта:', error);
+        }
+
+        function exportData(format) {
+            try {
+                // Собираем параметры фильтров
                 const params = new URLSearchParams();
                 
-                // Период
-                const timePeriod = document.getElementById('time-period').value;
-                params.set('time_period', timePeriod);
-                
-                if (timePeriod === 'custom') {
-                    const dateFrom = document.getElementById('date-from').value;
-                    const dateTo = document.getElementById('date-to').value;
-                    if (dateFrom && dateTo) {
-                        params.set('date_from', dateFrom);
-                        params.set('date_to', dateTo);
+                const timePeriodSelect = document.getElementById('time-period');
+                if (timePeriodSelect) {
+                    const timePeriod = timePeriodSelect.value;
+                    params.set('time_period', timePeriod);
+                    
+                    if (timePeriod === 'custom') {
+                        const dateFrom = document.getElementById('date-from');
+                        const dateTo = document.getElementById('date-to');
+                        if (dateFrom && dateTo && dateFrom.value && dateTo.value) {
+                            params.set('date_from', dateFrom.value);
+                            params.set('date_to', dateTo.value);
+                        }
                     }
                 }
                 
-                // Бот
-                const botFilter = document.getElementById('bot-filter').value;
-                if (botFilter !== 'all') {
-                    params.set('bot_filter', botFilter);
+                const botFilterSelect = document.getElementById('bot-filter');
+                if (botFilterSelect) {
+                    const botFilter = botFilterSelect.value;
+                    if (botFilter !== 'all') {
+                        params.set('bot_filter', botFilter);
+                    }
                 }
                 
-                // Торговая пара
-                const pairFilter = document.getElementById('pair-filter').value;
-                if (pairFilter !== 'all') {
-                    params.set('pair_filter', pairFilter);
+                const pairFilterSelect = document.getElementById('pair-filter');
+                if (pairFilterSelect) {
+                    const pairFilter = pairFilterSelect.value;
+                    if (pairFilter !== 'all') {
+                        params.set('pair_filter', pairFilter);
+                    }
                 }
                 
-                // Перезагружаем страницу с новыми параметрами
-                window.location.search = params.toString();
-            });
-
-            // Кнопка обновления
-            document.getElementById('refresh-trades').addEventListener('click', function() {
-                window.location.reload();
-            });
-        }
-        // Кнопки экспорта
-        document.getElementById('export-csv').addEventListener('click', function(e) {
-            e.preventDefault();
-            exportData('csv');
-        });
-
-        document.getElementById('export-json').addEventListener('click', function(e) {
-            e.preventDefault();
-            exportData('json');
-        });
-
-        document.getElementById('export-excel').addEventListener('click', function(e) {
-            e.preventDefault();
-            exportData('excel');
-        });
-
-        function exportData(format) {
-            // Собираем параметры фильтров
-            const params = new URLSearchParams();
-            
-            const timePeriod = document.getElementById('time-period').value;
-            params.set('time_period', timePeriod);
-            
-            if (timePeriod === 'custom') {
-                const dateFrom = document.getElementById('date-from').value;
-                const dateTo = document.getElementById('date-to').value;
-                if (dateFrom && dateTo) {
-                    params.set('date_from', dateFrom);
-                    params.set('date_to', dateTo);
-                }
+                // Добавляем параметр формата
+                params.set('export_format', format);
+                
+                // Отправляем запрос на сервер
+                window.location.href = `/analytics/export_deals/?${params.toString()}`;
+            } catch (error) {
+                console.error('Ошибка при экспорте данных:', error);
+                alert('Ошибка при экспорте данных. Попробуйте еще раз.');
             }
-            
-            const botFilter = document.getElementById('bot-filter').value;
-            if (botFilter !== 'all') {
-                params.set('bot_filter', botFilter);
-            }
-            
-            const pairFilter = document.getElementById('pair-filter').value;
-            if (pairFilter !== 'all') {
-                params.set('pair_filter', pairFilter);
-            }
-            
-            // Добавляем параметр формата
-            params.set('export_format', format);
-            
-            // Отправляем запрос на сервер
-            window.location.href = `/analytics/export_deals/?${params.toString()}`;
         }
     </script>
 </body>

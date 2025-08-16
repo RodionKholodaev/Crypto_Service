@@ -424,7 +424,9 @@ class TradingBot:
             order_info = await self.safe_fetch_order(order_id, trading_pair)
             # получение данных по комисии биржы
             exchange_commission = float(order_info.get('fee', {}).get('cost', 0.0))
-
+            if exchange_commission == 0.0:
+                # Если комиссия не получена, используем стандартную ставку 0.1%
+                exchange_commission = order_qty * current_price * 0.001
 
             if stop_loss_percent is not None:
                 if strategy:
@@ -441,9 +443,9 @@ class TradingBot:
                 stop_loss_price=stop_loss_price,
                 is_active=True,
                 exchange_commission=exchange_commission,
-                service_commission=0.0, # нужно будет потом исправить
+                service_commission=0.0, # Будет рассчитана при закрытии позиции
                 volume=order_qty,
-                pnl=0.0,
+                pnl=0.0, # Будет рассчитан при закрытии позиции
                 trading_pair=trading_pair,
                 order_id=order_id
             )
@@ -513,15 +515,18 @@ class TradingBot:
                 else:
                     stop_loss_price=None
 
+                # Рассчитываем примерную комиссию для лимитного ордера
+                estimated_commission = order_qty * limit_price * 0.001
+                
                 await sync_to_async(Deal.objects.create)(
                     bot=self.bot,
                     entry_price=limit_price,
                     take_profit_price=limit_price * (1 + take_profit_percent / 100) if strategy else limit_price * (1 - take_profit_percent / 100),
                     stop_loss_price=stop_loss_price,
-                    exchange_commission=0.0,
-                    service_commission=0.0,
+                    exchange_commission=estimated_commission,
+                    service_commission=0.0, # Будет рассчитана при закрытии позиции
                     volume=order_qty,
-                    pnl=0.0,
+                    pnl=0.0, # Будет рассчитан при закрытии позиции
                     trading_pair=trading_pair,
                     order_id=limit_order['id'],
                     is_active=False,       #  Не активна пока не исполнена
@@ -639,29 +644,43 @@ class TradingBot:
                         exit_price = current_price
                         entry_price = float(deal.entry_price)
                         qty = float(deal.volume)
-                        pnl = (exit_price - entry_price) * qty if strategy else (entry_price - exit_price) * qty
-                        deal.pnl = pnl
                         
-                        deal.service_commission = max(0, pnl * 0.1)
+                        # Правильный расчет PnL с учетом плеча
+                        bot_leverage = await sync_to_async(lambda: self.bot.bot_leverage)()
+                        if strategy:  # Long позиция
+                            pnl = (exit_price - entry_price) * qty * bot_leverage
+                        else:  # Short позиция
+                            pnl = (entry_price - exit_price) * qty * bot_leverage
+                        
+                        deal.pnl = pnl
+                        deal.exit_price = exit_price
+                        
+                        # Расчет комиссии сервиса (10% от прибыли, если она есть)
+                        if pnl > 0:
+                            deal.service_commission = pnl * 0.1
+                        else:
+                            deal.service_commission = 0.0
+                        
                         deal.is_active = False
                         deal.is_filled = True
 
-
-                        # уведомление админу
-                        deal.exit_price = current_price 
+                        # Сохраняем сделку
                         await sync_to_async(deal.save)()
+                        
+                        # Уведомление админу
                         await self.send_trade_notification("exit", deal)
 
 
                         if deal.service_commission > 0:
                             user = await sync_to_async(lambda: self.bot.user)()
-
-                            logger.info(f"сейчас будем применять сомнительныю функцию Decimal")
-
-                            user.balance -= Decimal(str(deal.service_commission))
-
-                            logger.info(f"применили Decimal, получили {user.balance}")
-
+                            
+                            # Импортируем Decimal для корректной работы с балансом
+                            from decimal import Decimal
+                            
+                            # Конвертируем в Decimal для точных вычислений
+                            commission_decimal = Decimal(str(deal.service_commission))
+                            user.balance -= commission_decimal
+                            
                             await sync_to_async(user.save)()
                             logger.info(f"Списана комиссия сервиса {deal.service_commission} с баланса пользователя {user.email}")
 
