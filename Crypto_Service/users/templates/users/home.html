@@ -38,7 +38,7 @@
                 <li><a href="{% url 'home' %}"><i class="fas fa-key"></i> Главная</a></li>
                 <li><a href="{% url 'profile' %}"><i class="fas fa-user"></i> Профиль</a></li>
                 <li><a href="{% url 'my_bots' %}"><i class="fas fa-robot"></i> Мои боты</a></li>
-                <li><a href="{% url 'analytics' %}"><i class="fas fa-chart-line"></i> Статистика</a></li>
+                {% comment %} <li><a href="{% url 'analytics' %}"><i class="fas fa-chart-line"></i> Статистика</a></li> {% endcomment %}
                 <li><a href="{% url 'help' %}"><i class="fas fa-question-circle"></i> Помощь</a></li>
             </ul>
         </aside>
@@ -52,13 +52,13 @@
             
             <!-- Dashboard Cards -->
             <div class="dashboard-cards">
-                <div class="card">
+                {% comment %} <div class="card">
                     <div class="card-header">
                         <div class="card-title">Общий баланс</div>
                         <i class="fas fa-coins" style="color: var(--warning);"></i>
                     </div>
                     <div class="card-value">{{user.balance}}</div>
-                </div>
+                </div> {% endcomment %}
                 <div class="card">
                     <div class="card-header">
                         <div class="card-title">Активные боты</div>
@@ -115,7 +115,7 @@
                 </div>
             </div>
 
-            <!-- Payment Section -->
+            {% comment %} <!-- Payment Section -->
             <div class="card">
                 <div class="card-header">
                     <div class="card-title">Пополнение баланса</div>
@@ -157,7 +157,7 @@
                         </button>
                     </form>
                 </div>
-            </div>
+            </div> {% endcomment %}
 
             <!-- API Keys Section -->
             <div class="card" style="margin-top: 30px;">

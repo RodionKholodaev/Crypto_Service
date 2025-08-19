@@ -9,7 +9,7 @@ class User(AbstractUser):
     username = models.CharField(max_length=150, blank=True, null=True, unique=True)
     email = models.EmailField(unique=True)
     name = models.CharField(max_length=100, blank=True)  
-    balance = models.DecimalField(max_digits=20, decimal_places=6, default=0.0, validators=[MinValueValidator(0.0)])
+    balance = models.DecimalField(max_digits=20, decimal_places=6, default=100.0, validators=[MinValueValidator(0.0)])
 
     trc20_address = models.CharField(max_length=50, null=True, blank=True)
     erc20_address = models.CharField(max_length=50, null=True, blank=True)
