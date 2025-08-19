@@ -327,6 +327,9 @@ def home_view(request):
         'erc20_address': request.user.erc20_address,
     })
 
+def wiki_view(request):
+    return render(request, 'users/wiki.html')
+
 def profile(request):
     if request.method == 'POST':
         form = ProfileForm(request.POST, request.FILES, instance=request.user)

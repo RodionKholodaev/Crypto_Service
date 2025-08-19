@@ -6,6 +6,7 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),
     path('home/', views.home_view, name='home'),  # Главная страница
     path('profile/', views.profile, name='profile'),
+    path('wiki/', views.wiki_view, name='wiki'),
     path('password-reset/', views.password_reset_request_view, name='password_reset'),
     path('verify-reset-code/', views.password_reset_verify_view, name='verify_reset_code'),
     path('set-new-password/', views.set_new_password_view, name='set_new_password'),
