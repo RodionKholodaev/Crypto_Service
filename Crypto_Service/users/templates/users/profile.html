@@ -85,7 +85,7 @@
                         <label for="id_email" class="form-label">Email</label>
                         <input type="email" id="id_email" class="form-control" value="{{ user.email }}" disabled>
                     </div>
-
+{% comment %} 
                     <h3>Тема</h3>
                     <div class="theme-selector">
                         <div class="theme-option light {% if not user.theme %}selected{% endif %}" data-theme="light">
@@ -98,7 +98,7 @@
                             <!-- <p>Темная тема</p> -->
                             <input type="radio" name="theme" value="True" {% if user.theme %}checked{% endif %} style="display: none;">
                         </div>
-                    </div>
+                    </div> {% endcomment %}
 
                     <button type="submit" class="btn btn-primary save-btn">
                         <i class="fas fa-save"></i> Сохранить

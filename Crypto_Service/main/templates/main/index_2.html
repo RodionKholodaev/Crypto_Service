@@ -1,0 +1,118 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CryptoBotHub - Простая торговля с ботами</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white text-gray-900">
+  <div id="root"></div>
+  <script type="text/babel">
+    function App() {
+      return (
+        <div className="min-h-screen flex flex-col">
+          {/* Header */}
+          <header className="bg-blue-600 text-white py-6">
+            <div className="container mx-auto px-4 text-center">
+              <h1 className="text-4xl font-bold">CryptoBotHub</h1>
+              <p className="text-lg mt-2">Бесплатная платформа для автоматической торговли</p>
+            </div>
+          </header>
+
+          {/* Main Content */}
+          <main className="container mx-auto px-4 py-12 flex-grow">
+            <section className="text-center">
+              <h2 className="text-3xl font-semibold text-blue-600 mb-6">Торгуйте просто и эффективно</h2>
+              <p className="text-lg text-gray-700 mb-8 max-w-2xl mx-auto">
+                Наш сервис делает торговлю криптовалютой легкой и доступной. Запускайте ботов и зарабатывайте в несколько кликов!
+              </p>
+              <div className="flex justify-center gap-4 mb-12">
+                <a href="{% url 'register' %}" className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition">Начать</a>
+                <a href="{% url 'login' %}" className="bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition">Вход</a>
+                <a href="{% url 'register' %}" className="bg-white text-blue-600 border border-blue-600 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition">Регистрация</a>
+              </div>
+            </section>
+
+            {/* Features */}
+            <section className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <h3 className="text-xl font-semibold text-blue-600 mb-2">Проверенные индикаторы</h3>
+                <p className="text-gray-600">RSI, CCI и другие для точных входов в сделки.</p>
+              </div>
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <h3 className="text-xl font-semibold text-blue-600 mb-2">Анализ данных</h3>
+                <p className="text-gray-600">Загружайте историю торгов в CSV для оптимизации.</p>
+              </div>
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <h3 className="text-xl font-semibold text-blue-600 mb-2">Простой интерфейс</h3>
+                <p className="text-gray-600">Торговля без сложностей — всего пара кликов.</p>
+              </div>
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <h3 className="text-xl font-semibold text-blue-600 mb-2">Безопасность</h3>
+                <p className="text-gray-600">Ваши API-ключи зашифрованы и используются только для торговли.</p>
+              </div>
+              <div className="bg-blue-50 p-6 rounded-lg text-center">
+                <h3 className="text-xl font-semibold text-blue-600 mb-2">Фьючерсы</h3>
+                <p className="text-gray-600">Зарабатывайте на росте и падении рынка.</p>
+              </div>
+            </section>
+          </main>
+
+          {/* Footer */}
+          <footer className="bg-blue-600 text-white py-6">
+            <div className="container mx-auto px-4 text-center">
+              <p className="text-sm">Поддержка: crypto.service.team.official@gmail.com</p>
+              <p className="text-sm mt-2">© 2025 CryptoBotHub. Все права защищены.</p>
+            </div>
+          </footer>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>

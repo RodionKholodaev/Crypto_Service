@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect
 from .forms import HelpRequestForm
 
 def index(request):
-    return render(request,'main/index.html')
+    return render(request,'main/index_2.html')
 
 
 def help_view(request):
