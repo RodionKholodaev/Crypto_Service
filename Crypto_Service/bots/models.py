@@ -84,7 +84,13 @@ class Indicator(models.Model):
     INDICATOR_TYPES = (
         ('RSI', 'Relative Strength Index'),
         ('CCI', 'Commodity Channel Index'),
-        # Добавьте другие типы по мере необходимости
+        ('STOCH_RSI', 'Stochastic RSI'),
+        ('WILLIAMS_R', 'Williams %R'),
+        ('AO', 'Awesome Oscillator'),
+        ('MFI', 'Money Flow Index'),
+        ('BB_PBAND', 'Bollinger Bands %B'),
+        ('VOL_SMA', 'Volume SMA Ratio'),
+        ('OBV', 'On-Balance Volume'),
     )
     
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='indicators')

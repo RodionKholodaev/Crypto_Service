@@ -7,6 +7,13 @@ class IndicatorForm(forms.ModelForm):
     INDICATOR_CHOICES = [
         ('RSI', 'Relative Strength Index'),
         ('CCI', 'Commodity Channel Index'),
+        ('STOCH_RSI', 'Stochastic RSI'),
+        ('WILLIAMS_R', 'Williams %R'),
+        ('AO', 'Awesome Oscillator'),
+        ('MFI', 'Money Flow Index'),
+        ('BB_PBAND', 'Bollinger Bands %B'),
+        ('VOL_SMA', 'Volume SMA Ratio'),
+        ('OBV', 'On-Balance Volume'),
     ]
     
     TIMEFRAME_CHOICES = [
@@ -21,9 +28,9 @@ class IndicatorForm(forms.ModelForm):
     
     CONDITION_CHOICES = [
         ('lt', '<'),
-        ('lte', '<='),
         ('gt', '>'),
-        ('gte', '>='),
+        # ('lte', '<='),  # закомментировано по требованию: оставляем только < и >
+        # ('gte', '>='),  # закомментировано по требованию: оставляем только < и >
     ]
     
     indicator_type = forms.ChoiceField(choices=INDICATOR_CHOICES, label="Индикатор")

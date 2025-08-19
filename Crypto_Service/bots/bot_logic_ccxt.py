@@ -1,7 +1,9 @@
 import asyncio
 import ccxt.async_support as ccxt
-from ta.momentum import RSIIndicator
+from ta.momentum import RSIIndicator, StochRSIIndicator, WilliamsRIndicator, AwesomeOscillatorIndicator
 from ta.trend import CCIIndicator
+from ta.volume import MFIIndicator, OnBalanceVolumeIndicator
+from ta.volatility import BollingerBands
 from django.conf import settings
 from bots.models import Bot, Deal, ExchangeAccount
 from users.models import User
@@ -250,12 +252,12 @@ class TradingBot:
                     
                     if condition == 'gt' and latest_rsi > value:
                         signals.append(True)
-                    elif condition == 'gte' and latest_rsi >= value:
-                        signals.append(True)
+                    # elif condition == 'gte' and latest_rsi >= value:
+                    #     signals.append(True)
                     elif condition == 'lt' and latest_rsi < value:
                         signals.append(True)
-                    elif condition == 'lte' and latest_rsi <= value:
-                        signals.append(True)
+                    # elif condition == 'lte' and latest_rsi <= value:
+                    #     signals.append(True)
                     else:
                         signals.append(False)
                     logger.debug(f"RSI: {latest_rsi}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
@@ -268,15 +270,138 @@ class TradingBot:
                     
                     if condition == 'gt' and latest_cci > value:
                         signals.append(True)
-                    elif condition == 'gte' and latest_cci >= value:
-                        signals.append(True)
+                    # elif condition == 'gte' and latest_cci >= value:
+                    #     signals.append(True)
                     elif condition == 'lt' and latest_cci < value:
                         signals.append(True)
-                    elif condition == 'lte' and latest_cci <= value:
-                        signals.append(True)
+                    # elif condition == 'lte' and latest_cci <= value:
+                    #     signals.append(True)
                     else:
                         signals.append(False)
                     logger.debug(f"CCI: {latest_cci}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'STOCH_RSI':
+                    stoch = StochRSIIndicator(close=df['close'], window=14, smooth1=3, smooth2=3)
+                    latest_stoch_k = stoch.stochrsi_k().iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_stoch_k > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_stoch_k >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_stoch_k < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_stoch_k <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"STOCH_RSI %K: {latest_stoch_k}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'WILLIAMS_R':
+                    willr = WilliamsRIndicator(high=df['high'], low=df['low'], close=df['close'], lbp=14).willr()
+                    latest_willr = willr.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_willr > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_willr >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_willr < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_willr <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"Williams %R: {latest_willr}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'AO':
+                    ao = AwesomeOscillatorIndicator(high=df['high'], low=df['low'], window1=5, window2=34).awesome_oscillator()
+                    latest_ao = ao.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_ao > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_ao >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_ao < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_ao <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"AO: {latest_ao}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'MFI':
+                    mfi = MFIIndicator(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'], window=14).money_flow_index()
+                    latest_mfi = mfi.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_mfi > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_mfi >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_mfi < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_mfi <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"MFI: {latest_mfi}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'BB_PBAND':
+                    bb = BollingerBands(close=df['close'], window=20, window_dev=2)
+                    pband = bb.bollinger_pband()
+                    latest_pband = pband.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_pband > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_pband >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_pband < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_pband <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"BB %B: {latest_pband}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'VOL_SMA':
+                    vol_sma = df['volume'].rolling(window=20).mean()
+                    if pd.isna(vol_sma.iloc[-1]) or vol_sma.iloc[-1] == 0:
+                        signals.append(False)
+                    else:
+                        latest_ratio = (df['volume'].iloc[-1] / vol_sma.iloc[-1]) * 100.0
+                        condition = parameters['condition']
+                        value = parameters['value']
+                        if condition == 'gt' and latest_ratio > value:
+                            signals.append(True)
+                        # elif condition == 'gte' and latest_ratio >= value:
+                        #     signals.append(True)
+                        elif condition == 'lt' and latest_ratio < value:
+                            signals.append(True)
+                        # elif condition == 'lte' and latest_ratio <= value:
+                        #     signals.append(True)
+                        else:
+                            signals.append(False)
+                        logger.debug(f"VOL SMA Ratio: {latest_ratio}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
+
+                elif indicator_type == 'OBV':
+                    obv = OnBalanceVolumeIndicator(close=df['close'], volume=df['volume']).on_balance_volume()
+                    latest_obv = obv.iloc[-1]
+                    condition = parameters['condition']
+                    value = parameters['value']
+                    if condition == 'gt' and latest_obv > value:
+                        signals.append(True)
+                    # elif condition == 'gte' and latest_obv >= value:
+                    #     signals.append(True)
+                    elif condition == 'lt' and latest_obv < value:
+                        signals.append(True)
+                    # elif condition == 'lte' and latest_obv <= value:
+                    #     signals.append(True)
+                    else:
+                        signals.append(False)
+                    logger.debug(f"OBV: {latest_obv}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
 
             except Exception as e:
                 logger.error(f"Ошибка при расчете индикатора {indicator_type}: {e}")
@@ -466,6 +591,34 @@ class TradingBot:
                     df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
                     cci = CCIIndicator(high=df['high'], low=df['low'], close=df['close'], window=20).cci()
                     indicators_data["CCI"] = cci.iloc[-1]
+                elif ind_type == "STOCH_RSI":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    stoch = StochRSIIndicator(close=df['close'], window=14, smooth1=3, smooth2=3)
+                    indicators_data["STOCH_RSI"] = stoch.stochrsi_k().iloc[-1]
+                elif ind_type == "WILLIAMS_R":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    willr = WilliamsRIndicator(high=df['high'], low=df['low'], close=df['close'], lbp=14).willr()
+                    indicators_data["WILLIAMS_R"] = willr.iloc[-1]
+                elif ind_type == "AO":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    ao = AwesomeOscillatorIndicator(high=df['high'], low=df['low'], window1=5, window2=34).awesome_oscillator()
+                    indicators_data["AO"] = ao.iloc[-1]
+                elif ind_type == "MFI":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    mfi = MFIIndicator(high=df['high'], low=df['low'], close=df['close'], volume=df['volume'], window=14).money_flow_index()
+                    indicators_data["MFI"] = mfi.iloc[-1]
+                elif ind_type == "BB_PBAND":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    bb = BollingerBands(close=df['close'], window=20, window_dev=2)
+                    indicators_data["BB_PBAND"] = bb.bollinger_pband().iloc[-1]
+                elif ind_type == "VOL_SMA":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    vol_sma = df['volume'].rolling(window=20).mean()
+                    indicators_data["VOL_SMA"] = ((df['volume'].iloc[-1] / vol_sma.iloc[-1]) * 100.0) if vol_sma.iloc[-1] != 0 else float('nan')
+                elif ind_type == "OBV":
+                    df = await self.get_kline_data(trading_pair, await sync_to_async(lambda: indicator.timeframe)())
+                    obv = OnBalanceVolumeIndicator(close=df['close'], volume=df['volume']).on_balance_volume()
+                    indicators_data["OBV"] = obv.iloc[-1]
 
             await self.send_trade_notification("entry", deal, indicators_data)
 
