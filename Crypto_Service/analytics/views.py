@@ -16,26 +16,25 @@ from io import BytesIO
 
 
 def dashboard_view(request):
-    # Базовый queryset: только закрытые и исполненные сделки
+    # Базовый queryset: только закрытые сделки
     deals = Deal.objects.filter(
         is_active=False,
         is_filled=True,
         bot__user=request.user
-    ).select_related('bot').exclude(pnl=0)  # Исключаем сделки с нулевым PnL
-
+    ).select_related('bot') 
     now = timezone.now()
     time_period = request.GET.get('time_period', 'week')
 
-    # Фильтр по времени
+    # Фильтр по времени (теперь по closed_at)
     if time_period == 'today':
         start_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        deals = deals.filter(created_at__gte=start_date)
+        deals = deals.filter(closed_at__gte=start_date)
     elif time_period == 'week':
         start_date = now - timedelta(days=7)
-        deals = deals.filter(created_at__gte=start_date)
+        deals = deals.filter(closed_at__gte=start_date)
     elif time_period == 'month':
         start_date = now - timedelta(days=30)
-        deals = deals.filter(created_at__gte=start_date)
+        deals = deals.filter(closed_at__gte=start_date)
     elif time_period == 'custom':
         date_from = request.GET.get('date_from')
         date_to = request.GET.get('date_to')
@@ -43,7 +42,7 @@ def dashboard_view(request):
             try:
                 start = datetime.strptime(date_from, "%Y-%m-%d")
                 end = datetime.strptime(date_to, "%Y-%m-%d") + timedelta(days=1)
-                deals = deals.filter(created_at__range=[start, end])
+                deals = deals.filter(closed_at__range=[start, end])
             except ValueError:
                 pass
 
@@ -57,9 +56,18 @@ def dashboard_view(request):
     if pair_filter and pair_filter != 'all':
         deals = deals.filter(trading_pair=pair_filter)
 
-    # Основные метрики
+    # Определяем депозит (только по выбранным ботам)
+    bot_qs = Bot.objects.filter(user=request.user)
+    if bot_filter and bot_filter != 'all':
+        bot_qs = bot_qs.filter(id=bot_filter)
+    if pair_filter and pair_filter != 'all':
+        bot_qs = bot_qs.filter(trading_pair=pair_filter)
+
+    total_deposit = bot_qs.aggregate(Sum('deposit'))['deposit__sum'] or 0
+
+    # Метрики
     total_profit = deals.aggregate(Sum('pnl'))['pnl__sum'] or 0
-    total_deposit = Bot.objects.filter(user=request.user).aggregate(Sum('deposit'))['deposit__sum'] or 0
+
     profit_percent = (total_profit / total_deposit * 100) if total_deposit > 0 else 0
 
     total_deals = deals.count()
@@ -67,9 +75,9 @@ def dashboard_view(request):
     win_rate = (win_deals / total_deals * 100) if total_deals > 0 else 0
     avg_profit_per_deal = total_profit / total_deals if total_deals > 0 else 0
 
-    # Гистограмма
+    # Гистограмма (по закрытию)
     daily_profit_qs = (
-        deals.annotate(date=TruncDay('created_at'))
+        deals.annotate(date=TruncDay('closed_at'))
         .values('date')
         .annotate(profit=Sum('pnl'))
         .order_by('date')
@@ -83,19 +91,20 @@ def dashboard_view(request):
         daily_profit_labels = []
         daily_profit_values = []
 
-    # Круговая диаграмма
+    # Круговая диаграмма (теперь сервисная комиссия учитывается отдельно)
     profit_loss_data = {
         'profit': float(deals.filter(pnl__gt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0),
         'loss': abs(float(deals.filter(pnl__lt=0).aggregate(Sum('pnl'))['pnl__sum'] or 0)),
-        'commission': float(deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0),
+        'exchange_commission': float(deals.aggregate(Sum('exchange_commission'))['exchange_commission__sum'] or 0),
+        'service_commission': float(deals.aggregate(Sum('service_commission'))['service_commission__sum'] or 0),
     }
     
-    # Проверяем, что есть данные для круговой диаграммы
-    if not any([profit_loss_data['profit'], profit_loss_data['loss'], profit_loss_data['commission']]):
-        profit_loss_data = {'profit': 0, 'loss': 0, 'commission': 0}
+
+    if not any(profit_loss_data.values()):
+        profit_loss_data = {k: 0 for k in profit_loss_data}
 
     # Пагинация
-    paginator = Paginator(deals.order_by('-created_at'), 20)
+    paginator = Paginator(deals.order_by('-closed_at'), 20)
     page_number = request.GET.get('page')
     deals_page = paginator.get_page(page_number)
 

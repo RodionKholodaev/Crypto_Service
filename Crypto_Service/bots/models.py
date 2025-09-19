@@ -86,11 +86,11 @@ class Indicator(models.Model):
         ('CCI', 'Commodity Channel Index'),
         ('STOCH_RSI', 'Stochastic RSI'),
         ('WILLIAMS_R', 'Williams %R'),
-        ('AO', 'Awesome Oscillator'),
+        # ('AO', 'Awesome Oscillator'),
         ('MFI', 'Money Flow Index'),
         ('BB_PBAND', 'Bollinger Bands %B'),
         ('VOL_SMA', 'Volume SMA Ratio'),
-        ('OBV', 'On-Balance Volume'),
+        # ('OBV', 'On-Balance Volume'),
     )
     
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='indicators')
@@ -123,6 +123,7 @@ class Deal(models.Model):
     order_id = models.CharField(max_length=100, null=True, blank=True)  # ID ордера на Bybit
     is_filled = models.BooleanField(default=False) # для лимитных ордеров
     exit_price = models.DecimalField(max_digits=20, decimal_places=8, null=True) # цена выхода
+    closed_at = models.DateTimeField(null=True, blank=True)
 
 
 

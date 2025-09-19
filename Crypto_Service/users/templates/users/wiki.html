@@ -112,7 +112,7 @@
                         <div class="wiki-note">Близко к Stoch, но знак и шкала иные.</div>
                     </div>
 
-                    <div class="wiki-card">
+                    {% comment %} <div class="wiki-card">
                         <h3>Awesome Oscillator (AO) <span class="tag">любой знак</span></h3>
                         <div class="wiki-kv">
                             <div><b>Смысл</b>: импульс (разница быстрых/медленных средних по медианной цене).</div>
@@ -121,7 +121,7 @@
                             Long: AO > 0.  |  Short: AO < 0.
                         </div>
                         <div class="wiki-note">Для порогов можно использовать небольшие значения около нуля.</div>
-                    </div>
+                    </div> {% endcomment %}
 
                     <div class="wiki-card">
                         <h3>MFI — Money Flow Index <span class="tag">0..100</span></h3>
@@ -146,7 +146,7 @@
                     </div>
 
                     <div class="wiki-card">
-                        <h3>Volume SMA Ratio <span class="tag">%</span></h3>
+                        <h3>Volume SMA Ratio <span class="tag">около 100%</span></h3>
                         <div class="wiki-kv">
                             <div><b>Смысл</b>: текущий объём относительно средней (SMA20), в процентах.</div>
                         </div>
@@ -156,7 +156,7 @@
                         <div class="wiki-note">150 означает 1.5× средней. Порог подбирается под инструмент.</div>
                     </div>
 
-                    <div class="wiki-card">
+                    {% comment %} <div class="wiki-card">
                         <h3>OBV — On-Balance Volume <span class="tag">абсолютный</span></h3>
                         <div class="wiki-kv">
                             <div><b>Смысл</b>: кумулятивный объём с направлением сделки.</div>
@@ -165,13 +165,13 @@
                             Используйте абсолютные пороги для входа: Long при OBV > X, Short при OBV < Y.
                         </div>
                         <div class="wiki-note">По запросу клиента сравнение только с абсолютным значением, без сглаживаний.</div>
-                    </div>
+                    </div> {% endcomment %}
                 </div>
 
                 <div class="wiki-card" style="margin-top:16px;">
                     <h3><i class="fas fa-lightbulb"></i> Быстрый чек-лист</h3>
                     <div class="wiki-kv">
-                        <div>1) Выберите таймфрейм под ваш горизонт сделки (скальп: 1m-5m, свинг: 1h-4h).</div>
+                        <div>1) Выберите таймфрейм под ваш горизонт сделки (скальпинг: 1m-5m, свинг: 1h-4h).</div>
                         <div>2) Выберите индикатор и порог из карточки выше.</div>
                         <div>3) Укажите условие «<» или «>» и числовое значение.</div>
                         <div>4) Запустите бота и наблюдайте результаты.</div>

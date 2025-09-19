@@ -9,11 +9,11 @@ class IndicatorForm(forms.ModelForm):
         ('CCI', 'Commodity Channel Index'),
         ('STOCH_RSI', 'Stochastic RSI'),
         ('WILLIAMS_R', 'Williams %R'),
-        ('AO', 'Awesome Oscillator'),
+        # ('AO', 'Awesome Oscillator'),
         ('MFI', 'Money Flow Index'),
         ('BB_PBAND', 'Bollinger Bands %B'),
         ('VOL_SMA', 'Volume SMA Ratio'),
-        ('OBV', 'On-Balance Volume'),
+        # ('OBV', 'On-Balance Volume'),
     ]
     
     TIMEFRAME_CHOICES = [
