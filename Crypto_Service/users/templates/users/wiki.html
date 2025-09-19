@@ -68,92 +68,84 @@
 
                 <div class="wiki-grid">
                     <div class="wiki-card">
-                        <h3>RSI — Relative Strength Index <span class="tag">0..100</span></h3>
+                        <h3>RSI — Relative Strength Index</h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: сила движения цены.</div>
+                            <div><b>Смысл:</b> сила движения цены.</div>
                             <div><b>Рекомендуемые входы</b>:</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: RSI < 30 — перепроданность.  |  Short: RSI > 70 — перекупленность.
                         </div>
-                        <div class="wiki-note">Обычно используют окна 14, H1–H4 таймфреймы.</div>
+                        <div class="wiki-note">Обычно используют таймфреймы 1h, 4h, 1D. (на мелких 5m, 15m часто даёт ложные сигналы)</div>
                     </div>
 
                     <div class="wiki-card">
-                        <h3>CCI — Commodity Channel Index <span class="tag">≈ -300..+300</span></h3>
+                        <h3>CCI — Commodity Channel Index</h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: отклонение цены от статистической нормы.</div>
+                            <div><b>Смысл:</b> отклонение цены от статистической нормы.</div>
+                            <div><b>Рекомендуемые входы</b>:</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: CCI < -100.  |  Short: CCI > 100.
                         </div>
-                        <div class="wiki-note">Чем экстремальнее значение, тем сильнее сигнал.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 15m, 1h, 4h. хорошо работает как фильтр в кратко- и среднесроке)</div>
                     </div>
 
                     <div class="wiki-card">
-                        <h3>Stochastic RSI (%K) <span class="tag">0..100</span></h3>
+                        <h3>Stochastic RSI (%K)</h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: положение RSI внутри своего диапазона.</div>
+                            <div><b>Смысл:</b> положение RSI внутри своего диапазона.</div>
+                            <div><b>Рекомендуемые входы</b>:</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: %K < 20.  |  Short: %K > 80.
                         </div>
-                        <div class="wiki-note">Используется именно быстрая линия %K.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 5m, 15m, 1h (очень чувствительный, на 4h и выше часто "залипает" в зоне перекупленности/перепроданности.)</div>
                     </div>
 
                     <div class="wiki-card">
-                        <h3>Williams %R <span class="tag">-100..0</span></h3>
+                        <h3>Williams %R </h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: положение цены относительно максимумов/минимумов периода.</div>
+                            <div><b>Смысл:</b> положение цены относительно максимумов/минимумов периода.</div>
+                            <div><b>Рекомендуемые входы</b>:</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: %R < -80.  |  Short: %R > -20.
                         </div>
-                        <div class="wiki-note">Близко к Stoch, но знак и шкала иные.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 15m, 1h (в долгосроке работает хуже, так как перегибы бывают слишком затяжные.) </div>
                     </div>
 
-                    {% comment %} <div class="wiki-card">
-                        <h3>Awesome Oscillator (AO) <span class="tag">любой знак</span></h3>
-                        <div class="wiki-kv">
-                            <div><b>Смысл</b>: импульс (разница быстрых/медленных средних по медианной цене).</div>
-                        </div>
-                        <div class="wiki-threshold">
-                            Long: AO > 0.  |  Short: AO < 0.
-                        </div>
-                        <div class="wiki-note">Для порогов можно использовать небольшие значения около нуля.</div>
-                    </div> {% endcomment %}
-
                     <div class="wiki-card">
-                        <h3>MFI — Money Flow Index <span class="tag">0..100</span></h3>
+                        <h3>MFI — Money Flow Index</h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: объёмно-взвешенный RSI.</div>
+                            <div><b>Смысл:</b> объёмно-взвешенный RSI.</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: MFI < 20.  |  Short: MFI > 80.
                         </div>
-                        <div class="wiki-note">Чувствительнее к дельте объёмов.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 1h, 4h, 1D (на мелких таймфреймах слишком шумный, но на средних и дневных хорошо показывает развороты.)</div>
                     </div>
 
                     <div class="wiki-card">
-                        <h3>Bollinger Bands %B <span class="tag">0..1</span></h3>
+                        <h3>Bollinger Bands %B </h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: положение цены внутри полос Боллинджера.</div>
+                            <div><b>Смысл:</b> положение цены внутри полос Боллинджера.</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: %B < 0.2.  |  Short: %B > 0.8.
                         </div>
-                        <div class="wiki-note">0 — нижняя полоса, 1 — верхняя.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 15m, 1h, 4h (Внутридневная торговля + свинг. На дневке тоже полезно, но редко)</div>
                     </div>
 
                     <div class="wiki-card">
-                        <h3>Volume SMA Ratio <span class="tag">около 100%</span></h3>
+                        <h3>Volume SMA Ratio</h3>
                         <div class="wiki-kv">
-                            <div><b>Смысл</b>: текущий объём относительно средней (SMA20), в процентах.</div>
+                            <div><b>Смысл:</b> текущий объём относительно средней (SMA20), в процентах.</div>
                         </div>
                         <div class="wiki-threshold">
                             Long: Ratio > 150.  |  Short: Ratio < 80.
                         </div>
-                        <div class="wiki-note">150 означает 1.5× средней. Порог подбирается под инструмент.</div>
+                        <div class="wiki-note">Лучшие таймфреймы: 15m, 1h, 4h (в долгосроке (1D, 1W) использовать сложно — там объёмные сплески выглядят иначе)</div>
                     </div>
 
                     {% comment %} <div class="wiki-card">
