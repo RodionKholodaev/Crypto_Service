@@ -110,7 +110,7 @@ DATABASES = {
         'NAME': 'mydb',
         'USER': 'admin',
         'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': 'db',  # Имя сервиса в docker-compose.yml
+        'HOST': 'db',  
         'PORT': '5432',
     }
 }

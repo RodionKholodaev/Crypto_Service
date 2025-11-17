@@ -252,12 +252,10 @@ class TradingBot:
                     
                     if condition == 'gt' and latest_rsi > value:
                         signals.append(True)
-                    # elif condition == 'gte' and latest_rsi >= value:
-                    #     signals.append(True)
+
                     elif condition == 'lt' and latest_rsi < value:
                         signals.append(True)
-                    # elif condition == 'lte' and latest_rsi <= value:
-                    #     signals.append(True)
+
                     else:
                         signals.append(False)
                     logger.debug(f"RSI: {latest_rsi}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
@@ -270,12 +268,10 @@ class TradingBot:
                     
                     if condition == 'gt' and latest_cci > value:
                         signals.append(True)
-                    # elif condition == 'gte' and latest_cci >= value:
-                    #     signals.append(True)
+
                     elif condition == 'lt' and latest_cci < value:
                         signals.append(True)
-                    # elif condition == 'lte' and latest_cci <= value:
-                    #     signals.append(True)
+
                     else:
                         signals.append(False)
                     logger.debug(f"CCI: {latest_cci}, Условие: {condition} {value}, Сигнал: {signals[-1]}")
