@@ -25,17 +25,20 @@ DEBUG = False
 
 #список доменов с которых можно обращаться к проекту
 #домен - уникальное имя сайта по которому он доступен в интернете
-ALLOWED_HOSTS = ['localhost','127.0.0.1','web', '45.8.249.44', 'cryptobot-hub.ru', 'cryptobot-hub.online']
+ALLOWED_HOSTS = ['localhost','127.0.0.1','web', '45.8.249.44', 'cryptobot-hub.ru', 'cryptobot-hub.online', '0.0.0.0']
 
 # Trust headers from Nginx reverse proxy and enforce HTTPS in Django
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = True
-SESSION_COOKIE_SECURE = True
-CSRF_COOKIE_SECURE = True
-USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = None
+SECURE_SSL_REDIRECT = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_SECURE = False
+
 CSRF_TRUSTED_ORIGINS = [
     'https://cryptobot-hub.ru',
     'https://cryptobot-hub.online',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://web:8000',
 ]
 
 STATIC_ROOT = '/app/staticfiles' 
@@ -153,15 +156,16 @@ USE_TZ = True
 
 
 
-# настройки для CSS, JS и изображений
+# Статические файлы
 STATIC_URL = '/static/'
-STATICFILES_DIRS = [BASE_DIR / "static"] 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_DIRS = [
+    os.path.join(BASE_DIR, 'static'),
+]
 
-# настройки для загружаемых файлов
-MEDIA_URL = '/media/' 
-MEDIA_ROOT = '/app/media'
-
-
+# Медиа файлы
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField' # заставляет автоматически создавать номер для записи в бд
 
@@ -189,37 +193,9 @@ DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 # Email для получения обращений
 SUPPORT_EMAIL = EMAIL_HOST_USER
 
-# Celery
-CELERY_BROKER_URL = 'redis://redis:6379/0'
-CELERY_RESULT_BACKEND = 'redis://redis:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
-CELERY_RESULT_SERIALIZER = 'json'
-CELERY_TIMEZONE = 'UTC'
 
-CELERY_TASK_TRACK_STARTED = True
 
-# Настройки для устойчивости
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-CELERY_BROKER_CONNECTION_RETRY = True
-CELERY_BROKER_CONNECTION_MAX_RETRIES = 100
-CELERY_TASK_ACKS_LATE = True  # Задачи не будут теряться при перезапуске воркера
 
-# Очереди
-CELERY_TASK_DEFAULT_QUEUE = 'default'
-CELERY_TASK_ROUTES = {
-    'bots.tasks.check_payments': {'queue': 'payments'},
-    'bots.tasks.run_trading_bot': {'queue': 'trading'},
-}
-
-# Расписание
-CELERY_BEAT_SCHEDULE = {
-    'check-trc20-erc20-transactions': {
-        'task': 'bots.tasks.check_payments', # Путь к задаче
-        'schedule': 600.0,  # Каждые 10 минут
-        'options': {'queue': 'payments'}, # Очередь для задачи
-    },
-}
 
 # Добавить настройки email админа
 ADMIN_EMAIL = 'kholodaev10e@mail.ru'

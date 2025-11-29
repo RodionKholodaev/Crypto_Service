@@ -28,7 +28,6 @@ from tronpy.keys import PrivateKey
 from web3 import Web3
 from django.conf import settings
 
-from bots.tasks import check_payments
 
 
 def register_view(request):

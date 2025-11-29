@@ -7,10 +7,6 @@ from django.views.decorators.http import require_POST
 from django.http import JsonResponse
 from django.db.models import Sum, F, Count, Q
 import json
-from .tasks import run_trading_bot
-from .statistics import generate_pnl_chart
-from celery import current_app
-from celery.result import AsyncResult
 
 
 @login_required
