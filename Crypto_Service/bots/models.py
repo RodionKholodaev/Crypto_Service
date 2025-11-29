@@ -3,6 +3,7 @@ from users.models import User
 from encrypted_model_fields.fields import EncryptedCharField
 from django.utils import timezone
 
+
 # модель для хранения api ключей
 class ExchangeAccount(models.Model):
     EXCHANGE_CHOICES = [
@@ -62,13 +63,9 @@ class Bot(models.Model):
         default=None,
     )
     
-    # Настройки сетки ордеров
-    grid_orders_count = models.PositiveIntegerField()
-    grid_overlap_percent = models.PositiveIntegerField()
     
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-
     is_active=models.BooleanField(default=True)
 
     # Поле для хранения последней ошибки бота
@@ -79,72 +76,142 @@ class Bot(models.Model):
 
 
 
-# данные о том какие индикаторы и как использует бот
+# модель Indicator с пороговыми значениями
 class Indicator(models.Model):
     INDICATOR_TYPES = (
         ('RSI', 'Relative Strength Index'),
         ('CCI', 'Commodity Channel Index'),
         ('STOCH_RSI', 'Stochastic RSI'),
         ('WILLIAMS_R', 'Williams %R'),
-        # ('AO', 'Awesome Oscillator'),
         ('MFI', 'Money Flow Index'),
         ('BB_PBAND', 'Bollinger Bands %B'),
         ('VOL_SMA', 'Volume SMA Ratio'),
-        # ('OBV', 'On-Balance Volume'),
     )
     
     bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='indicators')
     indicator_type = models.CharField(max_length=20, choices=INDICATOR_TYPES)
-    timeframe = models.CharField(max_length=10)  # Например: '1h', '4h', '1d'
-    parameters = models.JSONField()  # Гибкое хранение настроек
+    timeframe = models.CharField(max_length=10)  # '1m', '5m', '15m', '1h', '4h', '1d'
     
-
-
-
-# информация по сделкам 
-class Deal(models.Model):
-    bot = models.ForeignKey(
-        Bot, 
-        on_delete=models.SET_NULL,  # При удалении бота поле станет NULL
-        null=True,                  # Разрешает NULL
-        blank=True,                 # Разрешает пустое значение в формах
-        related_name='deals'
+    # Параметры расчета индикатора
+    period = models.PositiveIntegerField(default=14)
+    
+    # Пороговые значения для сигнала
+    threshold_value = models.DecimalField(
+        max_digits=10, 
+        decimal_places=2,
+        help_text="Пороговое значение для входа в сделку"
     )
-    entry_price = models.DecimalField(max_digits=20, decimal_places=8)
-    take_profit_price = models.DecimalField(max_digits=20, decimal_places=8)
-    stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8,null=True)
-    is_active = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    exchange_commission=models.DecimalField(max_digits=20, decimal_places=8)
-    service_commission=models.DecimalField(max_digits=20, decimal_places=8)
-    volume=models.DecimalField(max_digits=20, decimal_places=8)
-    pnl=models.DecimalField(max_digits=20, decimal_places=8)
-    trading_pair=models.CharField(max_length=30)
-    order_id = models.CharField(max_length=100, null=True, blank=True)  # ID ордера на Bybit
-    is_filled = models.BooleanField(default=False) # для лимитных ордеров
-    exit_price = models.DecimalField(max_digits=20, decimal_places=8, null=True) # цена выхода
-    closed_at = models.DateTimeField(null=True, blank=True)
-
-
-
-class CryptoTransaction(models.Model):
-    # выбор для сети
-    NETWORK_CHOICES = [
-        ('TRC20', 'TRON (TRC20)'),
-        ('ERC20', 'Ethereum (ERC20)'),
-    ]
-
-    tx_hash = models.CharField(max_length=100, unique=True)  # Хеш транзакции
-    network = models.CharField(max_length=10, choices=NETWORK_CHOICES)
-    user = models.ForeignKey(User, on_delete=models.CASCADE) # связь с пользователем
-    amount = models.DecimalField(max_digits=20, decimal_places=6)  # Сумма USDT
-    timestamp = models.DateTimeField()  # Время транзакции в блокчейне
-    processed_at = models.DateTimeField(auto_now_add=True)  # Когда обработано у нас
-
+    
+    # Направление пересечения порога
+    # 'above' - индикатор должен быть выше порога
+    # 'below' - индикатор должен быть ниже порога
+    cross_direction = models.CharField(
+        max_length=10,
+        choices=(('above', 'Выше'), ('below', 'Ниже')),
+        default='below'
+    )
+    
+    # Дополнительные параметры (для Bollinger Bands, Stochastic и т.д.)
+    extra_params = models.JSONField(default=dict, blank=True)
+    
+    # Последнее значение индикатора (для отслеживания пересечения)
+    last_value = models.DecimalField(
+        max_digits=10, 
+        decimal_places=4, 
+        blank=True, 
+        null=True
+    )
+    
     class Meta:
-        indexes = [
-            models.Index(fields=['tx_hash', 'network']),  # Для быстрого поиска
-        ]
+        unique_together = ('bot', 'indicator_type', 'timeframe', 'threshold_value')
 
-    def __str__(self):
-        return f"{self.network}: {self.tx_hash}"
+
+
+# models.py
+class Deal(models.Model):
+    """История сделок бота"""
+    
+    DEAL_STATUS = (
+        ('OPEN', 'Открыта'),
+        ('CLOSED_TP', 'Закрыта по Take Profit'),
+        ('CLOSED_SL', 'Закрыта по Stop Loss'),
+        ('CLOSED_MANUAL', 'Закрыта вручную'),
+        ('ERROR', 'Ошибка'),
+    )
+    
+    bot = models.ForeignKey(Bot, on_delete=models.CASCADE, related_name='deals')
+    
+    # Параметры входа
+    entry_time = models.DateTimeField(auto_now_add=True)
+    entry_price = models.DecimalField(max_digits=20, decimal_places=8)
+    position_size = models.DecimalField(max_digits=20, decimal_places=8)
+    side = models.CharField(max_length=10)  # 'buy' или 'sell'
+    leverage = models.PositiveIntegerField()
+    
+    # Параметры выхода
+    exit_time = models.DateTimeField(blank=True, null=True)
+    exit_price = models.DecimalField(max_digits=20, decimal_places=8, blank=True, null=True)
+    
+    # TP/SL
+    take_profit_price = models.DecimalField(max_digits=20, decimal_places=8)
+    stop_loss_price = models.DecimalField(max_digits=20, decimal_places=8, blank=True, null=True)
+    
+    # Результаты
+    status = models.CharField(max_length=20, choices=DEAL_STATUS, default='OPEN')
+    profit_loss = models.DecimalField(max_digits=20, decimal_places=8, blank=True, null=True)
+    profit_loss_percent = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    
+    # ID ордера на бирже
+    exchange_order_id = models.CharField(max_length=100, blank=True, null=True)
+    
+    # Дополнительная информация
+    notes = models.TextField(blank=True, null=True)
+    
+    class Meta:
+        ordering = ['-entry_time']
+    
+    def calculate_profit(self):
+        """Расчет прибыли/убытка"""
+        if not self.exit_price:
+            return None
+        
+        entry = float(self.entry_price)
+        exit = float(self.exit_price)
+        size = float(self.position_size)
+        
+        if self.side == 'buy':
+            pnl = (exit - entry) * size
+        else:  # sell (short)
+            pnl = (entry - exit) * size
+        
+        pnl_percent = (pnl / (entry * size)) * 100
+        
+        self.profit_loss = pnl
+        self.profit_loss_percent = pnl_percent
+        self.save()
+        
+        return pnl, pnl_percent
+
+
+
+# class CryptoTransaction(models.Model):
+#     # выбор для сети
+#     NETWORK_CHOICES = [
+#         ('TRC20', 'TRON (TRC20)'),
+#         ('ERC20', 'Ethereum (ERC20)'),
+#     ]
+
+#     tx_hash = models.CharField(max_length=100, unique=True)  # Хеш транзакции
+#     network = models.CharField(max_length=10, choices=NETWORK_CHOICES)
+#     user = models.ForeignKey(User, on_delete=models.CASCADE) # связь с пользователем
+#     amount = models.DecimalField(max_digits=20, decimal_places=6)  # Сумма USDT
+#     timestamp = models.DateTimeField()  # Время транзакции в блокчейне
+#     processed_at = models.DateTimeField(auto_now_add=True)  # Когда обработано у нас
+
+#     class Meta:
+#         indexes = [
+#             models.Index(fields=['tx_hash', 'network']),  # Для быстрого поиска
+#         ]
+
+#     def __str__(self):
+#         return f"{self.network}: {self.tx_hash}"
