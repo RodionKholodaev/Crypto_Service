@@ -21,7 +21,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 #список доменов с которых можно обращаться к проекту
 #домен - уникальное имя сайта по которому он доступен в интернете
@@ -41,7 +41,7 @@ CSRF_TRUSTED_ORIGINS = [
     'http://web:8000',
 ]
 
-STATIC_ROOT = '/app/staticfiles' 
+
 
 
 # список всех приложений + стандартные
@@ -158,9 +158,10 @@ USE_TZ = True
 
 # Статические файлы
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')  # Папка для collectstatic
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'static'),
+    os.path.join(BASE_DIR, 'static'),  # Глобальная папка static
+    os.path.join(BASE_DIR, 'Crypto_Service', 'static'),  # Папка static в Crypto_Service
 ]
 
 # Медиа файлы

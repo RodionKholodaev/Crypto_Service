@@ -39,5 +39,8 @@ RUN chown -R appuser:appuser /app
 # Переходим в папку с manage.py
 WORKDIR /app/Crypto_Service
 
+# Собираем статические файлы
+RUN python manage.py collectstatic --noinput
+
 # Запуск через Gunicorn
 CMD su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'

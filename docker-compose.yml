@@ -15,8 +15,7 @@ services:
 
   web:
     build: .
-    command: /bin/sh -c "python manage.py collectstatic --noinput && python manage.py migrate && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"
-    volumes:
+    command: /bin/sh -c "python manage.py migrate && su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'"
       - .:/app
       # Убираем volumes для static и media, т.к. они будут обслуживаться Django
     ports:
