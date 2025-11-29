@@ -27,8 +27,7 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt \
     --index-url https://pypi.org/simple/ \
-    --timeout 100 \
-    gunicorn
+    --timeout 100
 
 # Копируем проект
 COPY . .
@@ -39,8 +38,7 @@ RUN chown -R appuser:appuser /app
 # Переходим в папку с manage.py
 WORKDIR /app/Crypto_Service
 
-# Собираем статические файлы
-RUN python manage.py collectstatic --noinput
+# НЕ запускаем collectstatic в dev режиме!
 
-# Запуск через Gunicorn
-CMD su appuser -c 'gunicorn --bind 0.0.0.0:8000 cryptoservice.wsgi'
+# Запуск через runserver
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
